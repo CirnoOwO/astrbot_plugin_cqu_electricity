@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>宿舍电费预览</title>
+<style>
+:root {
+  --bg-canvas: #f2f4f8;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-sub: #64748b;
+  --text-muted: #94a3b8;
+  --border-card: rgba(15, 23, 42, 0.05);
+  --accent: #0d9488;
+  --accent-light: #14b8a6;
+  --accent-soft: #f0fdfa;
+  --accent-border: #ccfbf1;
+  --bar-normal-top: #2dd4bf;
+  --bar-normal-bot: #0d9488;
+  --bar-last-top: #fbbf24;
+  --bar-last-bot: #d97706;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 800px;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "HarmonyOS Sans SC", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.report {
+  width: 800px;
+  padding: 28px;
+  background: var(--bg-canvas);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 顶部栏 */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px 6px;
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 6px 16px -4px rgba(13, 148, 136, 0.35);
+}
+.icon svg path {
+  fill: #ffffff;
+}
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.room {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+}
+.stamp {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-card);
+  padding: 7px 14px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 核心双卡片 Bento 区 */
+.hero {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  gap: 16px;
+}
+.bento-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 24px;
+  padding: 24px 26px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.035);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+}
+.amount {
+  font-size: 64px;
+  letter-spacing: -2.5px;
+  font-weight: 800;
+  line-height: 1.08;
+  margin: 14px 0 8px;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+.currency {
+  font-size: 32px;
+  margin-right: 4px;
+  font-weight: 700;
+  color: var(--text-sub);
+  letter-spacing: 0;
+  vertical-align: 4px;
+}
+.settlement {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.settlement-values {
+  display: flex;
+  gap: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.balance-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* 右侧预计续航卡 */
+.forecast {
+  background: var(--bg-card);
+}
+.duration {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 14px 0 10px;
+  color: var(--accent);
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.battery-track {
+  width: 100%;
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 6px 0 12px;
+}
+.battery-fill {
+  height: 100%;
+  width: 60%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  border-radius: 999px;
+}
+.forecast-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 22px;
+}
+.expires-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+.advice {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* 图表卡片通用 */
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 24px;
+  padding: 22px 26px 18px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.035);
+}
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  margin: 0;
+  font-weight: 800;
+  color: var(--text-main);
+}
+.section-title span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  background: #f8fafc;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #f1f5f9;
+}
+.key {
+  display: inline-block;
+  vertical-align: middle;
+  width: 16px;
+  margin: 0 6px 2px 10px;
+  border-top: 2.5px solid var(--accent);
+}
+.key:first-child {
+  margin-left: 0;
+}
+.key.dash {
+  border-top-style: dashed;
+}
+.chart {
+  margin-top: 8px;
+}
+.chart svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+  font-family: inherit;
+}
+.note {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed #f1f5f9;
+}
+.empty {
+  padding: 36px 0;
+  color: var(--text-muted);
+  font-size: 15px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<main class="report">
+  <header class="top">
+    <div class="identity">
+      <div class="icon" id="theme-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24">
+          <path d="M13 2 4 14h7l-1 8 10-13h-7z"/>
+        </svg>
+      </div>
+      <div class="title-group">
+        <div class="title">宿舍电费看板</div>
+        <div class="room" id="room"></div>
+      </div>
+    </div>
+    <div class="stamp" id="captured"></div>
+  </header>
+
+  <div class="hero">
+    <div class="bento-card">
+      <div>
+        <div class="card-head">
+          <div class="label"><i class="status-dot"></i><span id="balance-label">电费余额</span></div>
+        </div>
+        <div class="amount"><span class="currency">¥</span><span id="balance"></span></div>
+      </div>
+      <div class="settlement" id="settlement" hidden>
+        <div class="settlement-values">
+          <span id="platform-balance"></span>
+          <span id="pending-cost"></span>
+        </div>
+        <div>用量已更新，平台尚未扣费，以上为预计余额。</div>
+      </div>
+      <div class="balance-sub" id="balance-sub">已保存的平台余额</div>
+    </div>
+
+    <div class="bento-card forecast">
+      <div>
+        <div class="card-head">
+          <div class="label">预计还能用</div>
+          <div class="advice" id="advice" hidden>建议尽快充值</div>
+        </div>
+        <div class="duration" id="duration"></div>
+        <div class="battery-track">
+          <div class="battery-fill" id="battery-fill"></div>
+        </div>
+      </div>
+      <div class="forecast-foot">
+        <div class="expires-text" id="expires" hidden></div>
+        <div class="balance-sub" id="daily-cost"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2 class="section-title">余额趋势<span><i class="key"></i>记录<i class="key dash"></i>预计 · 元</span></h2>
+    <div class="chart" id="balance-chart"></div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">每日用电<span id="meter-unit">度</span></h2>
+    <div class="chart" id="meter-chart"></div>
+    <p class="note" id="meter-note"></p>
+  </section>
+</main>
+
+<script id="report-data" type="application/json">__REPORT_DATA__</script>
+<script>
+'use strict';
+const d = JSON.parse(document.getElementById('report-data').textContent),
+      el = id => document.getElementById(id),
+      put = (id, x) => el(id).textContent = x;
+
+const NS = 'http://www.w3.org/2000/svg';
+const fmt = (n, digits = 2) => Number(n).toFixed(digits),
+      md = s => s.slice(5),
+      dayMs = 86400000;
+
+const isMorning = !!(d.settlement && d.settlement.estimated_balance_yuan !== null),
+      isSh = d.room.campus === 'shapingba';
+const balance = Number(d.display_balance),
+      days = d.forecast ? Number(d.forecast.days) : null;
+
+const isUrgent = days !== null && days <= 2,
+      isCritical = days !== null && days < 1,
+      isLow = days !== null && days > 2 && days <= 5;
+
+// 三级动态语义主题色（充足翠绿 / 偏低琥珀橙 / 告急珊瑚红）
+const theme = isCritical
+  ? { main: '#e11d48', light: '#fb7185', soft: '#fff1f2', border: '#fecdd3', shadow: 'rgba(225,29,72,0.32)' }
+  : isUrgent
+  ? { main: '#ea580c', light: '#fb923c', soft: '#fff7ed', border: '#fed7aa', shadow: 'rgba(234,88,12,0.32)' }
+  : isLow
+  ? { main: '#d97706', light: '#fbbf24', soft: '#fffbeb', border: '#fde68a', shadow: 'rgba(217,119,6,0.28)' }
+  : { main: '#0d9488', light: '#2dd4bf', soft: '#f0fdfa', border: '#ccfbf1', shadow: 'rgba(13,148,136,0.30)' };
+
+const rootStyle = document.documentElement.style;
+rootStyle.setProperty('--accent', theme.main);
+rootStyle.setProperty('--accent-light', theme.light);
+rootStyle.setProperty('--accent-soft', theme.soft);
+rootStyle.setProperty('--accent-border', theme.border);
+el('theme-icon').style.boxShadow = '0 6px 16px -4px ' + theme.shadow;
+
+const green = theme.main,
+      muted = '#64748b',
+      amber = '#d97706',
+      danger = '#e11d48',
+      grid = '#f1f5f9',
+      warnColor = isCritical ? danger : (isUrgent ? '#ea580c' : amber);
+
+const daily = days > 0 ? balance / days : null;
+const dt = new Date(d.captured_at),
+      end = days > 0 ? new Date(dt.getTime() + days * dayMs) : null;
+
+const dateFmt = t => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit' }).format(t).replace('/', '-');
+const timeFmt = t => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(t);
+
+put('room', d.room.campus_label + ' · ' + d.room.building.replace(/学生宿舍.*$/, '').replace('号', '舍') + ' ' + d.room.account);
+put('captured', d.captured_at ? (d.fresh ? '更新于 ' : '上次更新于 ') + timeFmt(dt) : '暂无采集记录');
+put('balance', d.display_balance === null ? '—' : fmt(balance));
+document.title = d.room.account + ' · ' + d.preview_scenario;
+
+put('duration', days === null ? '暂无法估算' : days < 1 ? '约 ' + Math.max(1, Math.round(days * 24)) + ' 小时' : '约 ' + Number(days.toFixed(1)) + ' 天');
+
+// 电量进度条（以 12 天为满格基准）
+const pct = days === null ? 50 : Math.min(100, Math.max(8, Math.round((days / 12) * 100)));
+el('battery-fill').style.width = pct + '%';
+
+if (end) {
+  put('expires', '约 ' + dateFmt(end).replace('-', '月') + '日用完');
+  el('expires').hidden = false;
+}
+if (daily !== null) {
+  put('daily-cost', '日均约 ¥' + fmt(daily));
+}
+if (isUrgent) {
+  el('advice').hidden = false;
+  el('duration').style.color = warnColor;
+  el('advice').style.color = warnColor;
+}
+if (isMorning) {
+  put('balance-label', '预计扣费后余额');
+  el('settlement').hidden = false;
+  el('balance-sub').hidden = true;
+  put('platform-balance', '平台余额 ¥' + fmt(d.balance));
+  put('pending-cost', '预计扣费 ¥' + fmt(d.settlement.pending_cost_yuan));
+}
+
+put('meter-note', isSh ? '按余额扣费 ÷ 电价估算；日期标在前一天。' : '按相邻采集的电表读数差统计，标在前一天，不等同自然日用电。');
+
+// 计算近几日平均用电并显示在右上角胶囊
+const validBars = (d.reference_bars || []).filter(b => b.value !== null);
+const avgKwh = validBars.length ? validBars.reduce((s, b) => s + Number(b.value), 0) / validBars.length : null;
+const baseUnit = isSh ? '估算 · 度' : '度';
+put('meter-unit', avgKwh !== null ? '日均 ' + fmt(avgKwh, 1) + ' 度 · ' + baseUnit : baseUnit);
+
+function node(tag, attrs, text, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+  if (text !== null && text !== undefined) n.textContent = text;
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function text(svg, x, y, s, attrs = {}) {
+  return node('text', { x, y, fill: muted, 'font-size': 13, 'font-weight': 500, ...attrs }, s, svg);
+}
+function line(svg, x1, y1, x2, y2, attrs = {}) {
+  return node('line', { x1, y1, x2, y2, stroke: green, 'stroke-width': 3.5, 'stroke-linecap': 'round', ...attrs }, null, svg);
+}
+function circle(svg, x, y, hollow = false, color = green, r = 4.5) {
+  return node('circle', { cx: x, cy: y, r, fill: hollow ? '#ffffff' : color, stroke: color, 'stroke-width': 2.5 }, null, svg);
+}
+function svgIn(id, h = 230) {
+  return node('svg', { viewBox: '0 0 836 ' + h, role: 'img', 'aria-label': id === 'balance-chart' ? '余额趋势与预计耗尽日期' : '每日用电' }, null, el(id));
+}
+
+// 去除左侧冗余 Y 轴数字，拓宽图表有效区域 (x0=28 -> x1=800)
+function axes(svg, axis, x0 = 28, x1 = 800, top = 36, bottom = 188) {
+  const span = (axis.max - axis.min) || 1;
+  const y = v => bottom - (Number(v) - axis.min) / span * (bottom - top);
+  for (const t of axis.ticks) {
+    line(svg, x0, y(t), x1, y(t), { stroke: grid, 'stroke-width': 1.2 });
+  }
+  return y;
+}
+
+function addDefs(svg) {
+  const defs = node('defs', {}, null, svg);
+  // 折线下方渐变填充
+  const areaGrad = node('linearGradient', { id: 'area-grad', x1: '0', y1: '0', x2: '0', y2: '1' }, null, defs);
+  node('stop', { offset: '0%', 'stop-color': green, 'stop-opacity': '0.24' }, null, areaGrad);
+  node('stop', { offset: '100%', 'stop-color': green, 'stop-opacity': '0.0' }, null, areaGrad);
+
+  // 常规柱状图渐变
+  const barGrad = node('linearGradient', { id: 'bar-grad', x1: '0', y1: '0', x2: '0', y2: '1' }, null, defs);
+  node('stop', { offset: '0%', 'stop-color': '#2dd4bf' }, null, barGrad);
+  node('stop', { offset: '100%', 'stop-color': '#0d9488' }, null, barGrad);
+
+  // 最新一日高亮柱状图渐变（琥珀暖金）
+  const barLastGrad = node('linearGradient', { id: 'bar-last-grad', x1: '0', y1: '0', x2: '0', y2: '1' }, null, defs);
+  node('stop', { offset: '0%', 'stop-color': '#fbbf24' }, null, barLastGrad);
+  node('stop', { offset: '100%', 'stop-color': '#d97706' }, null, barLastGrad);
+}
+
+function history(svg, x, y, bottom, skipLastDate = false) {
+  const p = d.balance_points;
+  const pts = [];
+  for (let i = 0; i < p.length; i++) {
+    if (p[i].value !== null) pts.push({ i, x: x(i), y: y(p[i].value), val: p[i].value, kind: p[i].kind });
+  }
+  // 绘制平滑渐变面积阴影
+  if (pts.length >= 2) {
+    const dPath = 'M ' + pts[0].x + ' ' + bottom + ' ' +
+                  pts.map(pt => 'L ' + pt.x + ' ' + pt.y).join(' ') +
+                  ' L ' + pts[pts.length - 1].x + ' ' + bottom + ' Z';
+    node('path', { d: dPath, fill: 'url(#area-grad)' }, null, svg);
+  }
+  // 绘制折线段
+  for (let i = 1; i < p.length; i++) {
+    if (p[i - 1].value === null || p[i].value === null) continue;
+    line(svg, x(i - 1), y(p[i - 1].value), x(i), y(p[i].value));
+  }
+  // 绘制节点与数值标签
+  for (let i = 0; i < p.length; i++) {
+    if (p[i].value !== null) {
+      const last = i === p.length - 1,
+            atRight = x(i) > 795;
+      const ptColor = (last && isUrgent) ? warnColor : green;
+      if (last) {
+        node('circle', { cx: x(i), cy: y(p[i].value), r: 10, fill: ptColor, opacity: 0.18 }, null, svg);
+      }
+      circle(svg, x(i), y(p[i].value), p[i].kind === 'estimated', ptColor, last ? 5.5 : 4.2);
+      text(svg, x(i) + (i === 0 ? 8 : atRight ? -8 : 0), y(p[i].value) - 15, fmt(p[i].value), {
+        'text-anchor': i === 0 ? 'start' : atRight ? 'end' : 'middle',
+        fill: last ? ptColor : '#1e293b',
+        'font-size': last ? 15 : 13.5,
+        'font-weight': 700
+      });
+    }
+    if (!(skipLastDate && i === p.length - 1)) {
+      text(svg, x(i), 218, md(p[i].day), { 'text-anchor': 'middle', fill: p[i].value !== null ? muted : '#cbd5e1' });
+    }
+  }
+}
+
+function dashed(svg, x0, y0, x1, y1) {
+  line(svg, x0, y0, x1, y1, { 'stroke-dasharray': '6 6', 'stroke-width': 2.8, opacity: 0.85 });
+}
+
+function renderBalance() {
+  const svg = svgIn('balance-chart', 232),
+        has = daily > 0,
+        limit = has ? Math.min(3, days) : 0,
+        top = 34,
+        bottom = 186;
+  addDefs(svg);
+  const y = axes(svg, d.balance_axis, 28, 800, top, bottom),
+        x = i => 36 + i * (764 / (6 + limit)),
+        last = x(6);
+
+  if (has) {
+    node('rect', { x: last, y: top - 10, width: 800 - last, height: bottom - top + 16, rx: 10, fill: '#f8fafc' }, null, svg);
+    for (const tick of d.balance_axis.ticks) line(svg, last, y(tick), 800, y(tick), { stroke: grid, 'stroke-width': 1 });
+  }
+
+  history(svg, x, y, bottom, has && 800 - last < 56);
+  if (!has) return;
+
+  line(svg, last, top - 8, last, bottom + 6, { stroke: '#cbd5e1', 'stroke-width': 1.2, 'stroke-dasharray': '4 4' });
+  const horizon = Math.min(days, limit),
+        ex = x(6 + horizon),
+        ey = y(Math.max(0, balance - daily * horizon));
+  dashed(svg, last, y(balance), ex, ey);
+
+  if (days <= limit) {
+    circle(svg, ex, ey, true, isUrgent ? warnColor : green, 5);
+  } else {
+    circle(svg, ex, ey, true, green, 4.5);
+    text(svg, ex - 6, ey - 14, '约 ' + fmt(balance - daily * 3), {
+      'text-anchor': 'end',
+      fill: green,
+      'font-size': 13.5,
+      'font-weight': 700
+    });
+  }
+
+  for (let n = 1; n < limit; n++) {
+    if (x(6 + limit) - x(6 + n) > 55) {
+      text(svg, x(6 + n), 218, dateFmt(new Date(dt.getTime() + n * dayMs)), { 'text-anchor': 'middle' });
+    }
+  }
+  text(svg, 800, 218, dateFmt(new Date(dt.getTime() + limit * dayMs)), { 'text-anchor': 'end' });
+  window.__forecastView = {
+    horizon_days: limit,
+    end_balance: Math.max(0, balance - daily * limit),
+    end_x: ex,
+    plot_end_x: 800
+  };
+}
+
+function renderBars() {
+  const bars = d.reference_bars;
+  if (!bars.some(b => b.value !== null)) {
+    el('meter-chart').textContent = '暂无完整日用电记录';
+    el('meter-chart').classList.add('empty');
+    el('meter-note').hidden = true;
+    return;
+  }
+  const svg = svgIn('meter-chart', 220),
+        top = 32,
+        bottom = 180;
+  addDefs(svg);
+  const y = axes(svg, d.meter_axis, 28, 800, top, bottom),
+        slot = 772 / bars.length,
+        w = Math.min(48, slot * 0.46),
+        last = bars.map(b => b.value !== null).lastIndexOf(true);
+
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i],
+          x = 28 + slot * (i + 0.5),
+          isLatest = i === last;
+    if (b.value !== null) {
+      const barH = Math.max(6, y(0) - y(b.value));
+      node('rect', {
+        x: x - w / 2,
+        y: y(b.value),
+        width: w,
+        height: barH,
+        rx: 11,
+        fill: isLatest ? 'url(#bar-last-grad)' : 'url(#bar-grad)'
+      }, null, svg);
+      text(svg, x, y(b.value) - 11, fmt(b.value), {
+        'text-anchor': 'middle',
+        fill: isLatest ? '#b45309' : '#0f172a',
+        'font-size': 15,
+        'font-weight': 800
+      });
+    } else {
+      // 空数据优雅胶囊底座占位
+      node('rect', { x: x - w * 0.35, y: bottom - 5, width: w * 0.7, height: 5, rx: 2.5, fill: '#e2e8f0' }, null, svg);
+    }
+    text(svg, x, 210, md(b.reference_day), {
+      'text-anchor': 'middle',
+      fill: isLatest ? '#0f172a' : (b.value !== null ? muted : '#cbd5e1'),
+      'font-weight': isLatest ? 700 : 500
+    });
+  }
+}
+
+renderBalance();
+renderBars();
+window.__reportModel = d;
+window.__reportReady = true;
+</script>
+</body>
+</html>

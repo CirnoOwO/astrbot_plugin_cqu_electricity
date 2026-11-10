@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>宿舍用电日历</title>
+<style>
+:root {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --main: #0f172a;
+  --sub: #64748b;
+  --muted: #94a3b8;
+  --accent: #0d9488;
+  --accent-light: #14b8a6;
+  --accent-soft: #f0fdfa;
+  --accent-border: #ccfbf1;
+  --danger: #e11d48;
+  --danger-bg: #fff1f2;
+  --warning: #d97706;
+  --border: rgba(15, 23, 42, 0.06);
+  --shadow: 0 4px 20px rgba(15, 23, 42, 0.035), 0 1px 3px rgba(15, 23, 42, 0.02);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  color: var(--main);
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 预览导航 */
+.preview-links {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px 28px 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  padding: 4px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+}
+.nav-caption {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0 6px 0 8px;
+  letter-spacing: 0.2px;
+}
+.preview-links a {
+  color: #475569;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.preview-links a:hover {
+  border-color: #cbd5e1;
+  color: var(--main);
+}
+.preview-links a.active {
+  color: #0f766e;
+  border-color: #99f6e4;
+  background: #ccfbf1;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(13, 148, 136, 0.12);
+}
+
+/* 主画布 */
+.report {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px 28px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 顶部栏 */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 4px 2px;
+  min-width: 0;
+}
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px -4px rgba(13, 148, 136, 0.4);
+}
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  letter-spacing: 0.3px;
+}
+.room {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stamp {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--sub);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--border);
+  padding: 7px 14px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 范围与基准 */
+.range {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px 2px;
+}
+.period {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #334155;
+}
+.basis {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--sub);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+/* Hero 双 Bento 卡片 */
+.hero[hidden] { display: none; }
+.hero {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sub);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+}
+.status-dot.balance-dot {
+  background: #3b82f6;
+}
+.status-dot.danger-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
+}
+.amount-wrapper {
+  margin: 12px 0 8px;
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+  min-width: 0;
+}
+.amount {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  color: var(--main);
+}
+.amount.energy {
+  color: var(--accent);
+}
+.amount.low-bal {
+  color: var(--danger);
+}
+.amount.empty-val {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: -1px;
+}
+.unit {
+  font-size: 20px;
+  color: var(--sub);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-left: 6px;
+}
+.currency {
+  font-size: 26px;
+  margin-right: 4px;
+  vertical-align: 3px;
+  color: var(--sub);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.subline {
+  color: var(--sub);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+/* 月历卡片 */
+.month-card {
+  padding: 24px 22px 20px;
+}
+.month-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.month-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--main);
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sub);
+  background: #f8fafc;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #f1f5f9;
+}
+.swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+.weekdays, .calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+.weekdays {
+  margin-bottom: 8px;
+}
+.weekday {
+  text-align: center;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 0;
+}
+
+/* 日历单格 */
+.day {
+  min-height: 104px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 9px 9px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #f8fafc;
+  min-width: 0;
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 18px;
+  min-width: 0;
+}
+.day-tags {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: calc(100% - 20px);
+}
+.date {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+.tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5.5px;
+  border-radius: 5px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.tag-today {
+  background: #0d9488;
+  color: #ffffff;
+}
+.tag-start {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.tag-increase {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid rgba(21, 128, 61, 0.15);
+}
+.tag-high {
+  color: #be123c;
+  background: #ffe4e6;
+}
+.tag-low {
+  color: #15803d;
+  background: #dcfce7;
+}
+.day.usage-high { border-color: #fda4af; }
+.day.usage-low { border-color: #86efac; }
+
+/* 格内数据层级：主数字高对比，单位轻量化 */
+.day-body {
+  margin: 4px 0 2px;
+  min-width: 0;
+}
+.day-value {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1.1;
+  color: var(--main);
+  white-space: nowrap;
+}
+.day-value small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-left: 2px;
+  opacity: 0.72;
+}
+.state {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* 格内余额小字：剥离色相干扰，采用沉稳中性灰，低额自动高亮告警 */
+.day-balance {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.25;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+.day-balance.low-balance {
+  color: #e11d48;
+  font-weight: 700;
+}
+
+/* Each month's observed range: mint -> teal -> amber -> rose. */
+.level-1 {
+  background: #f0fdf5;
+  border-color: rgba(16, 185, 129, 0.14);
+}
+.level-1 .day-value { color: #059669; }
+.level-1 .day-value small { color: #059669; }
+
+.level-2 {
+  background: #f0fdfa;
+  border-color: rgba(13, 148, 136, 0.16);
+}
+.level-2 .day-value { color: #0f766e; }
+.level-2 .day-value small { color: #0f766e; }
+
+.level-3 {
+  background: #fffbeb;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+.level-3 .day-value { color: #b45309; }
+.level-3 .day-value small { color: #b45309; }
+
+.level-4 {
+  background: #fff1f2;
+  border-color: rgba(244, 63, 94, 0.22);
+}
+.level-4 .day-value { color: #be123c; }
+.level-4 .day-value small { color: #be123c; }
+
+/* 特殊格修饰：强化“今天”的视觉焦点 */
+.today {
+  border: 2px solid var(--accent) !important;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.12);
+}
+.today .date {
+  color: var(--accent);
+  font-weight: 800;
+}
+.today .state {
+  color: var(--accent);
+  font-weight: 600;
+}
+.start {
+  box-shadow: inset 0 0 0 1.5px rgba(3, 105, 161, 0.35);
+}
+.missing {
+  background: repeating-linear-gradient(135deg, #f8fafc, #f8fafc 5px, #f1f5f9 5px, #f1f5f9 10px);
+  border-color: #e2e8f0;
+}
+.future {
+  background: #fafbfc;
+  opacity: 0.45;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+}
+.future .date {
+  font-weight: 400;
+}
+.outside {
+  background: transparent;
+  opacity: 0.25;
+}
+.outside .date {
+  font-weight: 400;
+}
+
+/* 月度累计底栏 */
+.month-sum {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sum-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #475569;
+  font-size: 12.5px;
+}
+.sum-metrics strong {
+  color: var(--main);
+  font-weight: 700;
+}
+
+/* 页脚说明 */
+.note {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--sub);
+  padding: 0 4px;
+}
+
+/* 响应式适配 */
+@media (max-width: 600px) {
+  .report {
+    padding: 16px 12px 28px;
+    gap: 12px;
+  }
+  .preview-links {
+    padding: 14px 12px 0;
+    gap: 8px;
+  }
+  .nav-group {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .top {
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .identity {
+    gap: 10px;
+  }
+  .icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+  .room {
+    font-size: 17px;
+  }
+  .eyebrow {
+    font-size: 11px;
+  }
+  .stamp {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+  .range {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .period {
+    font-size: 15px;
+  }
+  .basis {
+    font-size: 11px;
+  }
+  .hero {
+    gap: 10px;
+  }
+  .card {
+    border-radius: 18px;
+    padding: 16px 14px;
+  }
+  .amount {
+    font-size: 36px;
+    letter-spacing: -1.5px;
+  }
+  .amount.empty-val {
+    font-size: 28px;
+  }
+  .currency {
+    font-size: 20px;
+    vertical-align: 2px;
+  }
+  .unit {
+    font-size: 16px;
+    margin-left: 3px;
+  }
+  .label {
+    font-size: 12.5px;
+  }
+  .subline {
+    font-size: 11.5px;
+  }
+  .month-card {
+    padding: 18px 10px 14px;
+  }
+  .month-title {
+    font-size: 17px;
+  }
+  .weekdays, .calendar {
+    gap: 4px;
+  }
+  .day {
+    padding: 6px 4px 5px;
+    min-height: 86px;
+    border-radius: 10px;
+  }
+  .day-head {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .date {
+    font-size: 11px;
+  }
+  .tag {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+  .day-body {
+    margin: 2px 0 1px;
+  }
+  .day-value {
+    font-size: 15px;
+    letter-spacing: -0.5px;
+  }
+  .day-value small {
+    display: none;
+  }
+  .day-balance {
+    font-size: 8.5px;
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+  }
+  .state {
+    font-size: 9.5px;
+    line-height: 1.25;
+  }
+  .legend {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+  .legend::before {
+    content: '度 · ';
+    margin-right: 1px;
+  }
+  .swatch {
+    width: 10px;
+    height: 8px;
+  }
+  .month-sum {
+    font-size: 11.5px;
+    margin-top: 14px;
+    padding-top: 10px;
+  }
+  .sum-metrics {
+    font-size: 11px;
+    gap: 8px;
+  }
+  .note {
+    font-size: 11px;
+  }
+}
+</style>
+</head>
+<body>
+
+
+<main class="report">
+  <header class="top">
+    <div class="identity">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M13 2 4 14h7l-1 8 10-13h-7z" fill="white"/>
+        </svg>
+      </div>
+      <div class="title-group">
+        <div class="eyebrow" id="eyebrow">宿舍用电日历</div>
+        <div class="room" id="room"></div>
+      </div>
+    </div>
+    <div class="stamp" id="captured"></div>
+  </header>
+
+  <div class="range">
+    <div class="period" id="period"></div>
+    <div class="basis" id="basis"></div>
+  </div>
+
+  <div class="hero">
+    <section class="card">
+      <div class="label"><i class="status-dot"></i><span id="energy-label">本轮累计用电</span></div>
+      <div class="amount-wrapper">
+        <span class="amount energy" id="total"></span>
+        <span class="unit" id="total-unit">度</span>
+      </div>
+      <div class="subline" id="coverage"></div>
+    </section>
+
+    <section class="card">
+      <div class="label"><i class="status-dot balance-dot" id="balance-dot"></i><span id="balance-label">最新平台余额</span></div>
+      <div class="amount-wrapper">
+        <span class="currency" id="currency">¥</span>
+        <span class="amount" id="balance"></span>
+      </div>
+      <div class="subline" id="balance-change"></div>
+    </section>
+  </div>
+
+  <div id="months" style="display:contents"></div>
+
+  <footer class="note" id="note"></footer>
+</main>
+
+<script id="report-data" type="application/json">__REPORT_DATA__</script>
+<script>
+'use strict';
+const d = JSON.parse(document.getElementById('report-data').textContent),
+      el = id => document.getElementById(id),
+      put = (id, s) => { const n = el(id); if (n) n.textContent = s; };
+
+const fmt = (v, digits = 2) => Number(v).toFixed(digits),
+      md = s => s ? s.slice(5).replace('-', '月') + '日' : '',
+      time = s => {
+        if (!s) return '';
+        return new Intl.DateTimeFormat('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(new Date(s));
+      };
+
+const element = (tag, cls, text, parent) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== null && text !== undefined) n.textContent = text;
+  if (parent) parent.appendChild(n);
+  return n;
+};
+
+// 顶部信息
+put('eyebrow', d.title_label || (d.scope === 'month' ? '月度用电日历' : '本轮用电日历'));
+put('room', d.room.campus_label + ' · ' + d.room.building.replace(/学生宿舍.*$/, '').replace('号', '舍') + ' ' + d.room.account);
+put('captured', d.captured_at ? '数据更新于 ' + time(d.captured_at) : (d.scope === 'month' ? '该月暂无采集记录' : '暂无采集记录'));
+
+// 周期与口径
+put('period', d.range_label || (md(d.start_day) + ' — ' + md(d.end_day)));
+put('basis', (d.basis_label || '') + (d.page_count > 1 ? ' · 第 ' + d.page_index + '/' + d.page_count + ' 页' : ''));
+if (d.page_index > 1) document.querySelector('.hero').hidden = true;
+
+// 左卡：累计用电
+const energyTitle = d.scope === 'month'
+  ? (d.inferred ? '该月累计估算用电' : '该月累计用电')
+  : (d.inferred ? '本轮累计估算用电' : '本轮累计用电');
+put('energy-label', energyTitle);
+
+if (d.total_kwh !== null) {
+  put('total', fmt(d.total_kwh));
+  el('total').classList.remove('empty-val');
+  el('total-unit').hidden = false;
+  put('coverage', d.recorded_days + ' 天有用电记录');
+} else {
+  put('total', '无记录');
+  el('total').classList.add('empty-val');
+  el('total-unit').hidden = true;
+  put('coverage', d.recorded_days > 0 ? (d.recorded_days + ' 天有用电记录') : (d.scope === 'month' ? '该自然月无有效用电记录' : '暂无完整日用电记录'));
+}
+
+// 右卡：电费余额（支持低额视觉预警）
+put('balance-label', d.balance_label || (d.scope === 'month' ? '该月最后记录余额' : '最新平台余额'));
+
+if (d.balance !== null) {
+  const balNum = Number(d.balance);
+  put('balance', fmt(balNum));
+  el('balance').classList.remove('empty-val');
+  el('balance').classList.toggle('low-bal', balNum < 15);
+  if (el('balance-dot')) {
+    el('balance-dot').classList.toggle('danger-dot', balNum < 15);
+  }
+  el('currency').hidden = false;
+  if (d.balance_net_change !== null) {
+    const net = Number(d.balance_net_change);
+    put('balance-change', net === 0 ? '期间余额无净变动' : '期间余额净' + (net > 0 ? '增加' : '减少') + ' ¥' + fmt(Math.abs(net)));
+  } else {
+    put('balance-change', '未统计变动');
+  }
+} else {
+  put('balance', '无记录');
+  el('balance').classList.add('empty-val');
+  el('balance').classList.remove('low-bal');
+  el('currency').hidden = true;
+  put('balance-change', '无平台余额记录');
+}
+
+// 页脚说明：标明用量与余额同源，且标在前一天不等同自然日用电
+const baseCalcNote = d.inferred
+  ? '每日用电按相邻余额扣费 ÷ 电价估算，标在前一天，不等同自然日用电；用量与格内余额均取自同一次结束采集。'
+  : '每日用电按相邻采集电表读数差统计，标在前一天，不等同自然日用电；用量与格内余额均取自同一次结束采集。';
+put('note', baseCalcNote + ' 余额增加可能来自充值或补助。');
+
+document.title = d.room.account + ' · ' + (d.title_label || (d.scope === 'month' ? '月度' : '本轮') + '用电日历');
+
+// 渲染月历
+const byDay = new Map(d.days.map(x => [x.day, x]));
+let visible = 0;
+
+for (const month of d.months) {
+  const prefix = month.year + '-' + String(month.month).padStart(2, '0') + '-';
+  // Match the displayed precision, so visually identical values don't acquire
+  // misleadingly different colors or opposite extreme labels.
+  const monthValues = d.days
+    .filter(x => x.day.startsWith(prefix) && !x.future && x.value !== null)
+    .map(x => Number(fmt(x.value)))
+    .filter(Number.isFinite);
+  const minValue = monthValues.length ? Math.min(...monthValues) : null;
+  const maxValue = monthValues.length ? Math.max(...monthValues) : null;
+  const varied = minValue !== null && maxValue > minValue;
+  const section = element('section', 'card month-card', null, el('months'));
+  const head = element('div', 'month-head', null, section);
+  element('div', 'month-title', month.year + '年 ' + month.month + '月', head);
+
+  const legend = element('div', 'legend', null, head);
+  if (varied) {
+    element('span', '', '较少 ' + fmt(minValue) + '度', legend);
+    for (let i = 1; i <= 4; i++) element('i', 'swatch level-' + i, null, legend);
+    element('span', '', '较多 ' + fmt(maxValue) + '度', legend);
+  } else {
+    element('span', '', minValue === null ? '暂无用量记录'
+      : (monthValues.length > 1 ? '每日均为 ' : '已记录 ') + fmt(minValue) + ' 度', legend);
+  }
+
+  const weekdays = element('div', 'weekdays', null, section);
+  for (const name of ['一', '二', '三', '四', '五', '六', '日']) {
+    element('div', 'weekday', name, weekdays);
+  }
+
+  const grid = element('div', 'calendar', null, section);
+  grid.setAttribute('role', 'list');
+
+  for (let i = 0; i < month.first_weekday; i++) {
+    element('div', '', null, grid);
+  }
+
+  let subtotal = 0, count = 0;
+
+  for (let n = 1; n <= month.days_in_month; n++) {
+    const key = month.year + '-' + String(month.month).padStart(2, '0') + '-' + String(n).padStart(2, '0');
+    const item = byDay.get(key);
+
+    let cls = 'day';
+    if (!item) {
+      cls += ' outside';
+    } else {
+      if (item.today) cls += ' today';
+      if (item.start) cls += ' start';
+      if (item.future) cls += ' future';
+      if (item.value === null) {
+        cls += ' missing';
+      } else {
+        const num = Number(fmt(item.value));
+        const level = varied ? Math.min(4, 1 + Math.floor(4 * (num - minValue) / (maxValue - minValue))) : 1;
+        cls += ' level-' + level;
+        if (varied && num === maxValue) cls += ' usage-high';
+        if (varied && num === minValue) cls += ' usage-low';
+      }
+    }
+
+    const day = element('div', cls, null, grid);
+    day.dataset.day = key;
+    day.setAttribute('role', 'listitem');
+
+    const dayHead = element('div', 'day-head', null, day);
+    element('span', 'date', String(n), dayHead);
+
+    if (!item) {
+      day.setAttribute('aria-label', key + '，范围外');
+      continue;
+    }
+
+    const tags = element('div', 'day-tags', null, dayHead);
+    if (item.today) {
+      element('span', 'tag tag-today', '今天', tags);
+    } else if (item.start) {
+      element('span', 'tag tag-start', '起点', tags);
+    }
+    if (item.balance_increase) {
+      element('span', 'tag tag-increase', '余额↑', tags);
+    }
+    if (varied && item.value !== null && !item.future) {
+      const value = Number(fmt(item.value));
+      if (value === maxValue) element('span', 'tag tag-high', '最高', tags);
+      if (value === minValue) element('span', 'tag tag-low', '最低', tags);
+    }
+
+    const dayBody = element('div', 'day-body', null, day);
+
+    if (item.value !== null) {
+      const numVal = Number(item.value);
+      const valEl = element('div', 'day-value', fmt(numVal), dayBody);
+      element('small', '', '度', valEl);
+      day.dataset.kwh = item.value;
+      subtotal += numVal;
+      count++;
+      visible++;
+      const extreme = day.classList.contains('usage-high') ? '，本月最高' : day.classList.contains('usage-low') ? '，本月最低' : '';
+      day.setAttribute('aria-label', key + '，' + fmt(numVal) + '度' + extreme);
+
+      if (item.balance !== null && item.balance !== undefined) {
+        const balNum = Number(item.balance);
+        const isLow = balNum < 15;
+        const balEl = element('div', 'day-balance' + (isLow ? ' low-balance' : ''), '余 ¥' + fmt(balNum), day);
+        balEl.dataset.balance = item.balance;
+      }
+    } else {
+      const stateText = item.today ? '待后续采集' : (item.future ? '尚未到日期' : item.status);
+      day.dataset.state = stateText;
+      day.setAttribute('aria-label', key + '，' + stateText);
+
+      if (!item.future) {
+        element('div', 'state', stateText, dayBody);
+      } else {
+        element('div', 'state', '—', dayBody);
+      }
+    }
+  }
+
+  const row = element('div', 'month-sum', null, section);
+  if (count > 0) {
+    element('span', '', '该月已记录用电 ' + fmt(subtotal) + ' 度 (有效记录 ' + count + ' 天)', row);
+    const metrics = element('div', 'sum-metrics', null, row);
+    const avgSpan = element('span', '', '日均 ', metrics);
+    element('strong', '', fmt(subtotal / count) + ' 度', avgSpan);
+  } else {
+    element('span', '', '该月暂无完整日用电记录', row);
+  }
+}
+
+window.__calendarModel = d;
+window.__calendarReady = true;
+window.__visibleUsageDays = visible;
+</script>
+</body>
+</html>

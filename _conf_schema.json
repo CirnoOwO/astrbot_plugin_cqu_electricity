@@ -1,0 +1,76 @@
+{
+  "session": {
+    "type": "string",
+    "description": "缴费大厅 access_token 原值（支持直接粘贴控制台带引号的字符串；留空回退到 token_file）",
+    "default": "",
+    "secret": true,
+    "hint": "在缴费大厅 F12 控制台通过 sessionStorage.getItem('access_token') 复制，带引号亦可直接粘贴。"
+  },
+  "allowed_groups": {
+    "type": "list",
+    "description": "允许的 QQ 群号；留空沿用 AstrBot 全局消息白名单",
+    "default": []
+  },
+  "auto_capture_enabled": {
+    "type": "bool",
+    "description": "每日采集已绑定宿舍；认证缺失时不执行网络请求",
+    "default": true
+  },
+  "reminder_enabled": {
+    "type": "bool",
+    "description": "允许用户通过命令或工具设置金额/天数提醒，发送到最后设置的会话",
+    "default": true
+  },
+  "low_balance_threshold": {
+    "type": "string",
+    "description": "默认合计余额提醒阈值（元）",
+    "default": "10"
+  },
+  "cache_seconds": {
+    "type": "int",
+    "description": "非强制采集的成功结果复用秒数（0～3600）；手动刷新绕过此缓存，普通查询只读本地数据",
+    "default": 60
+  },
+  "request_timeout": {
+    "type": "int",
+    "description": "一次完整查询总超时秒数（1～90）",
+    "default": 40
+  },
+  "electricity_price": {
+    "type": "string",
+    "description": "虎溪补助电量折算电价（元/度）",
+    "default": "0.54"
+  },
+  "query_scheme": {
+    "type": "string",
+    "description": "缴费平台协议，默认 HTTPS 并严格校验证书；特定校园网络环境下可切为 HTTP（注意明文传输风险）",
+    "default": "https",
+    "options": [
+      "http",
+      "https"
+    ]
+  },
+  "token_file": {
+    "type": "string",
+    "description": "私有认证 JSON 文件路径；留空使用插件数据目录 auth.json，字段 access_token",
+    "default": ""
+  },
+  "capture_times": {
+    "type": "list",
+    "description": "每日采集批次起点（北京时间 HH:MM），宿舍均匀错峰约5分钟，数量增加时延长",
+    "default": [
+      "09:00",
+      "14:00"
+    ]
+  },
+  "capture_window_minutes": {
+    "type": "int",
+    "description": "每批最短启动/重试窗口（分钟）；大量宿舍时自动延长，最多重试一次，间隔至少5分钟",
+    "default": 15
+  },
+  "enable_private": {
+    "type": "bool",
+    "description": "允许 QQ 私聊电费命令；不放开其他私聊消息的全局白名单",
+    "default": true
+  }
+}

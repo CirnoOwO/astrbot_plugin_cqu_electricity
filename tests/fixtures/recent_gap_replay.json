@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "room": {
+    "campus": "huxi",
+    "building": "测试园9栋",
+    "account": "TEST9001"
+  },
+  "as_of": "2026-11-06T11:20:00+08:00",
+  "schedule": {
+    "time": "14:00",
+    "window_minutes": 15
+  },
+  "captures": [
+    {
+      "id": 1,
+      "started_at": "2026-10-31T01:02:20+00:00",
+      "finished_at": "2026-10-31T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "90",
+        "cash_balance_yuan": "90",
+        "meter_reading_kwh": "400",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 2,
+      "started_at": "2026-10-31T06:02:20+00:00",
+      "finished_at": "2026-10-31T06:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "14:00",
+      "reading": {
+        "total_balance_yuan": "88",
+        "cash_balance_yuan": "88",
+        "meter_reading_kwh": "400",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 3,
+      "started_at": "2026-11-01T01:02:20+00:00",
+      "finished_at": "2026-11-01T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "88",
+        "cash_balance_yuan": "88",
+        "meter_reading_kwh": "405",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 4,
+      "started_at": "2026-11-01T06:02:20+00:00",
+      "finished_at": "2026-11-01T06:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "14:00",
+      "reading": {
+        "total_balance_yuan": "85.30",
+        "cash_balance_yuan": "85.30",
+        "meter_reading_kwh": "405",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 5,
+      "started_at": "2026-11-02T01:02:20+00:00",
+      "finished_at": "2026-11-02T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "85.30",
+        "cash_balance_yuan": "85.30",
+        "meter_reading_kwh": "412",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 6,
+      "started_at": "2026-11-02T06:02:20+00:00",
+      "finished_at": "2026-11-02T06:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "14:00",
+      "reading": {
+        "total_balance_yuan": "81.52",
+        "cash_balance_yuan": "81.52",
+        "meter_reading_kwh": "412",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 7,
+      "started_at": "2026-11-03T01:02:20+00:00",
+      "finished_at": "2026-11-03T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "78.28",
+        "cash_balance_yuan": "78.28",
+        "meter_reading_kwh": "418",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 8,
+      "started_at": "2026-11-03T06:02:20+00:00",
+      "finished_at": "2026-11-03T06:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "14:00",
+      "reading": {
+        "total_balance_yuan": "78.28",
+        "cash_balance_yuan": "78.28",
+        "meter_reading_kwh": "418",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 9,
+      "started_at": "2026-11-04T01:02:20+00:00",
+      "finished_at": "2026-11-04T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "78.28",
+        "cash_balance_yuan": "78.28",
+        "meter_reading_kwh": "426",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 10,
+      "started_at": "2026-11-04T06:02:20+00:00",
+      "finished_at": "2026-11-04T06:02:22+00:00",
+      "status": "failed",
+      "error_code": "UPSTREAM_UNAVAILABLE",
+      "capture_slot": null
+    },
+    {
+      "id": 11,
+      "started_at": "2026-11-04T06:07:20+00:00",
+      "finished_at": "2026-11-04T06:07:22+00:00",
+      "status": "failed",
+      "error_code": "UPSTREAM_UNAVAILABLE",
+      "capture_slot": null
+    },
+    {
+      "id": 12,
+      "started_at": "2026-11-05T01:02:20+00:00",
+      "finished_at": "2026-11-05T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "73.96",
+        "cash_balance_yuan": "73.96",
+        "meter_reading_kwh": "432",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 13,
+      "started_at": "2026-11-05T06:02:20+00:00",
+      "finished_at": "2026-11-05T06:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "14:00",
+      "reading": {
+        "total_balance_yuan": "70.72",
+        "cash_balance_yuan": "70.72",
+        "meter_reading_kwh": "432",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    },
+    {
+      "id": 14,
+      "started_at": "2026-11-06T01:02:20+00:00",
+      "finished_at": "2026-11-06T01:02:22+00:00",
+      "status": "success",
+      "error_code": null,
+      "capture_slot": "09:00",
+      "reading": {
+        "total_balance_yuan": "70.72",
+        "cash_balance_yuan": "70.72",
+        "meter_reading_kwh": "436",
+        "unit_price_yuan": "0.54",
+        "subsidy_kwh": "0",
+        "subsidy_balance_yuan": null
+      }
+    }
+  ],
+  "provenance": {
+    "label": "完全构造的仿真回归数据；覆盖下午缺采、近期连续基线及早间待扣费，不包含任何真实寝室读数轨迹"
+  }
+}

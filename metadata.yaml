@@ -1,0 +1,8 @@
+name: astrbot_plugin_cqu_electricity
+display_name: 重庆大学宿舍电费
+desc: 宿舍电费看板、月报、金额或天数提醒及本人宿舍管理工具。
+version: v0.1.17
+author: Zesuy
+astrbot_version: ">=4.28.1,<5"
+support_platforms:
+  - aiocqhttp

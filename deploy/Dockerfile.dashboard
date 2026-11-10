@@ -1,0 +1,9 @@
+# Build on the exact AstrBot image already running on the deployment host.
+ARG ASTRBOT_BASE
+FROM ${ASTRBOT_BASE}
+USER root
+RUN uv pip install --system --no-cache playwright==1.55.0 \
+    && python -m playwright install --with-deps --only-shell chromium \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
