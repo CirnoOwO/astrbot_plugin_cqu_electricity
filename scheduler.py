@@ -101,7 +101,11 @@ class Scheduler:
         now=(now or datetime.now(BEIJING)).astimezone(BEIJING)
         day=now.date().isoformat()
         self.next_delay=60
-        if not self.service.client.configured(): return
+        can_run = self.service.client.configured()
+        if not can_run and getattr(self.service.client, "nh_enabled", False):
+            rooms = self._eligible_rooms()
+            can_run = any(r.get("campus") == "shapingba" for r in rooms.values())
+        if not can_run: return
         rooms=self._eligible_rooms()
         for hour,minute in self.capture_times:
             due=now.replace(hour=hour,minute=minute,second=0,microsecond=0)
