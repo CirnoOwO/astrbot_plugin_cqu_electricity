@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import httpx
 import pytest
@@ -9,15 +10,31 @@ from cqu_plugin.client import ElectricityClient, parse_nh_reading
 from cqu_plugin.repository import Repository
 from cqu_plugin.service import ElectricityService
 from cqu_plugin.scheduler import Scheduler
+from cqu_plugin.summary import summary, daily_brief_text
 
 ROOM_B10 = Room("shapingba", "B区10舍", "B10S306")
+ROOM_HUXI = Room("huxi", "竹园5栋", "B5344")
 IDENTITY = ("qq-test", "123", "1001")
 ORIGIN = "qq-test:GroupMessage:123"
+BEIJING = timezone(timedelta(hours=8))
 
 LOGIN_SUCCESS = {"code": "0", "msg": "", "SysLoginAcctID": 2054, "SysLoginAcctNT": "B10S306", "username": "B10S306"}
 LOGIN_NOT_FOUND = {"code": "-3", "msg": "抱歉,查询不到当前房间号或手机号!"}
 ACCT_DATA = [{"F_AcctID": 2054, "PointerName": "B区10号学生宿舍(271)Z", "F_AcctName": "B10S306", "B_F_InitBalance": 80.86, "B_F_InitAllowance": 2.50, "B_F_Totalace": 83.36}]
 SACCT_DATA = {"iTotalRecords": 1, "iTotalDisplayRecords": 1, "aaData": [["正在运行", "已通电", "77275", "62000", "16-4", "B10S306(16-4)", "瑞德单相电表(10000)", "1", "B区10舍306", "家属区、学生电价0.54", "0.5400", "2024/5/26 0:00:00", "2026/11/11 12:00:00", "0", "7061", "0", "B区10号学生宿舍(271)Z"]]}
+DEBILS_DATA = {
+    "dbs": [
+        {"index": 0, "F_Month": "2026年10月", "F_UsedDegree": "163", "F_TotalPrice": 88.02},
+        {"index": 1, "F_Month": "2026年11月", "F_UsedDegree": "49", "F_TotalPrice": 26.46},
+    ]
+}
+GOUR_DATA = {
+    "iTotalRecords": 2,
+    "aaData": [
+        ["2026/11/11 00:00", "B区10号学生宿舍(271)Z", "瑞德单相电表(10000)", "0", "1.0000", "0.5400", "0.5400"],
+        ["2026/11/11 06:00", "B区10号学生宿舍(271)Z", "瑞德单相电表(10000)", "0", "2.0000", "0.5400", "1.0800"],
+    ]
+}
 
 
 @pytest.fixture
@@ -27,10 +44,12 @@ def repo(tmp_path):
     value.close()
 
 
-def make_nh_transport(status=200, login_resp=None, acct_resp=None, sacct_resp=None):
+def make_nh_transport(status=200, login_resp=None, acct_resp=None, sacct_resp=None, debils_resp=None, gour_resp=None):
     login = login_resp if login_resp is not None else LOGIN_SUCCESS
     acct = acct_resp if acct_resp is not None else ACCT_DATA
     sacct = sacct_resp if sacct_resp is not None else SACCT_DATA
+    debils = debils_resp if debils_resp is not None else DEBILS_DATA
+    gour = gour_resp if gour_resp is not None else GOUR_DATA
 
     def handle(request):
         url = str(request.url)
@@ -40,6 +59,10 @@ def make_nh_transport(status=200, login_resp=None, acct_resp=None, sacct_resp=No
             return httpx.Response(status, json=acct)
         elif "/df/Home/GetSAcctDs" in url:
             return httpx.Response(status, json=sacct)
+        elif "/df/Home/GetDeBils" in url:
+            return httpx.Response(status, json=debils)
+        elif "/df/Home/Get48GourDs" in url:
+            return httpx.Response(status, json=gour)
         return httpx.Response(404)
 
     return httpx.MockTransport(handle)
@@ -78,6 +101,69 @@ def test_parse_nh_reading_missing_device_falls_back():
     assert reading.resolved_building == "B区10舍"
 
 
+def test_parse_nh_reading_with_debils_and_gour():
+    now_bj = datetime(2026, 11, 11, 14, 0, 0, tzinfo=BEIJING)
+    reading = parse_nh_reading(ROOM_B10, ACCT_DATA, SACCT_DATA, Decimal("0.54"), debils_data=DEBILS_DATA, gour_data=GOUR_DATA, now_bj=now_bj)
+    assert reading.monthly_kwh == Decimal("49")
+    assert reading.monthly_cost_yuan == Decimal("26.46")
+    assert reading.monthly_name == "2026年11月"
+    assert reading.today_kwh == Decimal("3.0000")
+    assert reading.today_cost_yuan == Decimal("1.6200")
+    assert reading.today_point == "06:00"
+
+    fields = reading.fields()
+    assert fields["monthly_kwh"] == "49"
+    assert fields["monthly_cost_yuan"] == "26.46"
+    assert fields["monthly_name"] == "2026年11月"
+    assert fields["today_kwh"] == "3.0000"
+    assert fields["today_cost_yuan"] == "1.6200"
+    assert fields["today_point"] == "06:00"
+
+    fake_result = {
+        "ok": True,
+        "room": {"campus": "shapingba", "building": "B区10舍", "room_number": "B10S306"},
+        "reading": {**fields, "finished_at": "2026-11-11T06:00:00+00:00"},
+    }
+    normal_text = summary(fake_result, detail=False)
+    assert "今日用量" not in normal_text
+    assert "本月累计" not in normal_text
+
+    detail_text = summary(fake_result, detail=True)
+    assert "今日用量：约 3.00 度（今日零点至 06:00） · 约 1.62 元" in detail_text
+    assert "本月累计：49.00 度 · 电费 26.46 元（2026年11月）" in detail_text
+
+    fake_brief_result = {**fake_result, "daily_brief": {"state": "ready", "estimate": None}}
+    brief_text = daily_brief_text(fake_brief_result, detail=True)
+    assert "今日用量：约 3.00 度（今日零点至 06:00） · 约 1.62 元" in brief_text
+    assert "本月累计：49.00 度 · 电费 26.46 元（2026年11月）" in brief_text
+
+
+def test_huxi_campus_detail_unaffected():
+    fake_huxi = {
+        "ok": True,
+        "room": {"campus": "huxi", "building": "竹园5栋", "room_number": "B5344"},
+        "reading": {
+            "finished_at": "2026-11-11T06:00:00+00:00",
+            "cash_balance_yuan": "50.00",
+            "subsidy_kwh": None,
+            "subsidy_balance_yuan": None,
+            "total_balance_yuan": "50.00",
+            "meter_reading_kwh": "100.00",
+            "unit_price_yuan": "0.54",
+            "today_kwh": None,
+            "today_cost_yuan": None,
+            "today_point": None,
+            "monthly_kwh": None,
+            "monthly_cost_yuan": None,
+            "monthly_name": None,
+        },
+    }
+    detail_text = summary(fake_huxi, detail=True)
+    assert "今日用量" not in detail_text
+    assert "本月累计" not in detail_text
+    assert "校区：虎溪" in detail_text
+
+
 def test_nh_fetch_success_without_auth(repo, tmp_path):
     client = ElectricityClient(tmp_path / "missing", nh_enabled=True, transport=make_nh_transport())
     assert client.configured() is False
@@ -89,10 +175,12 @@ def test_nh_fetch_success_without_auth(repo, tmp_path):
     assert result["ok"]
     assert result["reading"]["cash_balance_yuan"] == "80.86"
     assert result["reading"]["meter_reading_kwh"] == "7061"
+    assert result["reading"]["monthly_name"] == "2026年11月"
+    assert result["reading"]["monthly_kwh"] == "49"
 
     responses = repo.all("SELECT stage, http_status FROM query_responses ORDER BY sequence_no")
-    assert len(responses) == 3
-    assert [r["stage"] for r in responses] == ["nh_login", "nh_account", "nh_device"]
+    assert len(responses) == 5
+    assert [r["stage"] for r in responses] == ["nh_login", "nh_account", "nh_device", "nh_debils", "nh_48h"]
 
 
 def test_nh_fetch_room_not_found(repo, tmp_path):

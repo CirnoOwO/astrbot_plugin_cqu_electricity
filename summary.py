@@ -5,7 +5,7 @@ from decimal import Decimal
 from .models import ERRORS
 
 BEIJING = timezone(timedelta(hours=8))
-PUBLIC_FIELDS = ("finished_at","cash_balance_yuan","subsidy_kwh","subsidy_balance_yuan","total_balance_yuan","meter_reading_kwh","unit_price_yuan")
+PUBLIC_FIELDS = ("finished_at","cash_balance_yuan","subsidy_kwh","subsidy_balance_yuan","total_balance_yuan","meter_reading_kwh","unit_price_yuan","today_kwh","today_cost_yuan","today_point","monthly_kwh","monthly_cost_yuan","monthly_name")
 
 
 def local_time(value):
@@ -57,6 +57,16 @@ def summary(result, *, detail=False):
     if detail:
         if reading.get("meter_reading_kwh") is not None: lines += ["累计电表读数："+fmt(reading["meter_reading_kwh"])+" 度"]
         lines += ["电价："+fmt(reading["unit_price_yuan"])+" 元/度", "校区："+{"huxi":"虎溪","shapingba":"沙坪坝"}[room["campus"]]]
+        if reading.get("today_kwh") is not None or reading.get("monthly_kwh") is not None:
+            lines += ["", "📊 用电统计："]
+            if reading.get("today_kwh") is not None:
+                point_desc = f"今日零点至 {reading.get('today_point', '当前')}"
+                cost_str = f" · 约 {Decimal(reading['today_cost_yuan']):.2f} 元" if reading.get("today_cost_yuan") is not None else ""
+                lines += [f"今日用量：约 {Decimal(reading['today_kwh']):.2f} 度（{point_desc}）{cost_str}"]
+            if reading.get("monthly_kwh") is not None:
+                month_label = f"（{reading.get('monthly_name')}）" if reading.get("monthly_name") else ""
+                cost_str = f" · 电费 {Decimal(reading['monthly_cost_yuan']):.2f} 元" if reading.get("monthly_cost_yuan") is not None else ""
+                lines += [f"本月累计：{Decimal(reading['monthly_kwh']):.2f} 度{cost_str}{month_label}"]
         if delta and not delta.get("available"): lines += [delta.get("reason", "用量暂不可用")]
     label="上次成功" if result.get("stale") else "缓存记录" if result.get("cached") else "更新"
     lines += ["", "🕒 "+label+"于 "+local_time(reading["finished_at"]), "查看历史：/电费 历史", "立即更新：/电费 刷新"]
@@ -94,6 +104,16 @@ def daily_brief_text(result, *, detail=False):
         if reading.get("subsidy_balance_yuan") is not None:lines += [f"补贴：{Decimal(reading['subsidy_balance_yuan']):.2f} 元"]
         if reading.get("meter_reading_kwh") is not None:lines += [f"累计电表读数：{Decimal(reading['meter_reading_kwh']):.2f} 度"]
         lines += [f"电价：{Decimal(reading['unit_price_yuan']):f} 元/度"]
+        if reading.get("today_kwh") is not None or reading.get("monthly_kwh") is not None:
+            lines += ["", "📊 用电统计："]
+            if reading.get("today_kwh") is not None:
+                point_desc = f"今日零点至 {reading.get('today_point', '当前')}"
+                cost_str = f" · 约 {Decimal(reading['today_cost_yuan']):.2f} 元" if reading.get("today_cost_yuan") is not None else ""
+                lines += [f"今日用量：约 {Decimal(reading['today_kwh']):.2f} 度（{point_desc}）{cost_str}"]
+            if reading.get("monthly_kwh") is not None:
+                month_label = f"（{reading.get('monthly_name')}）" if reading.get("monthly_name") else ""
+                cost_str = f" · 电费 {Decimal(reading['monthly_cost_yuan']):.2f} 元" if reading.get("monthly_cost_yuan") is not None else ""
+                lines += [f"本月累计：{Decimal(reading['monthly_kwh']):.2f} 度{cost_str}{month_label}"]
     if estimate:lines += ["用电及电费为日读数差估算，不代表实际扣费。"]
     lines += ["查看历史：/电费 历史"]
     return "\n".join(lines)

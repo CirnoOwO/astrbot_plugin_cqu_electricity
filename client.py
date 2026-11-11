@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from dataclasses import replace
 from html import unescape, escape
@@ -13,6 +14,7 @@ from urllib.parse import quote
 import httpx
 from .models import Room, Reading, QueryError, number, building_name, shapingba_building
 
+BEIJING = timezone(timedelta(hours=8))
 HOST = "payment.cqu.edu.cn"
 NH_HOST = "nh.cqu.edu.cn:26989"
 SENSITIVE = {"token", "accesstoken", "refreshtoken", "authorization", "synjonesauth", "cookie", "setcookie", "password", "secret", "appsecret"}
@@ -142,7 +144,7 @@ def parse_reading(room, response_map, price):
         raise QueryError("PARSE_ERROR") from None
 
 
-def parse_nh_reading(room, acct_data, sacct_data, default_price):
+def parse_nh_reading(room, acct_data, sacct_data, default_price=Decimal("0.54"), debils_data=None, gour_data=None, now_bj=None):
     if not isinstance(acct_data, list) or not acct_data:
         raise QueryError("INVALID_RESPONSE")
     acct = acct_data[0]
@@ -175,6 +177,47 @@ def parse_nh_reading(room, acct_data, sacct_data, default_price):
             except (ValueError, TypeError):
                 raise QueryError("PARSE_ERROR") from None
 
+    monthly_kwh, monthly_cost_yuan, monthly_name = None, None, None
+    if isinstance(debils_data, dict):
+        dbs = debils_data.get("dbs")
+        if isinstance(dbs, list) and dbs:
+            last_db = dbs[-1]
+            if isinstance(last_db, dict):
+                try:
+                    if last_db.get("F_UsedDegree") not in (None, ""):
+                        monthly_kwh = number(last_db.get("F_UsedDegree"))
+                    if last_db.get("F_TotalPrice") not in (None, ""):
+                        monthly_cost_yuan = number(last_db.get("F_TotalPrice"))
+                    if last_db.get("F_Month") not in (None, ""):
+                        monthly_name = str(last_db.get("F_Month")).strip()
+                except (ValueError, TypeError):
+                    monthly_kwh, monthly_cost_yuan, monthly_name = None, None, None
+
+    today_kwh, today_cost_yuan, today_point = None, None, None
+    if isinstance(gour_data, dict):
+        gour_rows = gour_data.get("aaData")
+        if isinstance(gour_rows, list):
+            if now_bj is None:
+                now_bj = datetime.now(BEIJING)
+            today_slash = now_bj.strftime("%Y/%m/%d")
+            today_dash = now_bj.strftime("%Y-%m-%d")
+            today_rows = [
+                row for row in gour_rows
+                if isinstance(row, list) and len(row) > 6 and (str(row[0]).startswith(today_slash) or str(row[0]).startswith(today_dash))
+            ]
+            if today_rows:
+                try:
+                    today_kwh = sum((number(r[4]) for r in today_rows if r[4] not in (None, "")), Decimal(0))
+                    today_cost_yuan = sum((number(r[6]) for r in today_rows if r[6] not in (None, "")), Decimal(0))
+                    last_t = str(today_rows[-1][0]).strip()
+                    today_point = last_t.split()[-1] if " " in last_t else last_t
+                except (ValueError, TypeError):
+                    today_kwh, today_cost_yuan, today_point = None, None, None
+            else:
+                today_kwh = Decimal("0")
+                today_cost_yuan = Decimal("0")
+                today_point = "00:00"
+
     id_info = shapingba_building(building_raw) or shapingba_building(room.building)
     resolved = f"{id_info[0]}区{id_info[1]}舍" if id_info else room.building
     return Reading(
@@ -183,6 +226,12 @@ def parse_nh_reading(room, acct_data, sacct_data, default_price):
         meter_reading_kwh=meter_reading,
         unit_price_yuan=unit_price,
         resolved_building=resolved,
+        today_kwh=today_kwh,
+        today_cost_yuan=today_cost_yuan,
+        today_point=today_point,
+        monthly_kwh=monthly_kwh,
+        monthly_cost_yuan=monthly_cost_yuan,
+        monthly_name=monthly_name,
     )
 
 
@@ -247,7 +296,17 @@ class ElectricityClient:
                     acct_data = await request("nh_account", "GET", "/df/Home/GetAcctDs", params={"SysLoginAcctID": acct_id})
                     sacct_data = await request("nh_device", "GET", "/df/Home/GetSAcctDs", params={"sEcho": 1, "iDisplayStart": 0, "iDisplayLength": 30, "sSearch": acct_id})
 
-                    return parse_nh_reading(room, acct_data, sacct_data, self.price)
+                    debils_data, gour_data = None, None
+                    try:
+                        debils_data = await request("nh_debils", "GET", "/df/Home/GetDeBils", params={"SysLoginAcctID": acct_id})
+                    except Exception:
+                        pass
+                    try:
+                        gour_data = await request("nh_48h", "GET", "/df/Home/Get48GourDs", params={"sEcho": 1, "iDisplayStart": 0, "iDisplayLength": 200, "sSearch": acct_id})
+                    except Exception:
+                        pass
+
+                    return parse_nh_reading(room, acct_data, sacct_data, self.price, debils_data=debils_data, gour_data=gour_data)
         except QueryError:
             raise
         except (TimeoutError, httpx.TimeoutException):
