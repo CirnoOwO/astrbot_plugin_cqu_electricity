@@ -239,10 +239,142 @@ def test_scheduler_runs_for_shapingba_without_token(repo, tmp_path):
         pass
 
     scheduler = Scheduler(service, lambda *x: True, send, capture_times=("09:00",), reminder_enabled=False)
-    clock_now = Scheduler(service, lambda *x: True, send).capture_times
-    # Verify tick does not abort early when client has nh_enabled and shapingba rooms
-    can_run = client.configured()
-    if not can_run and client.nh_enabled:
-        rooms = scheduler._eligible_rooms()
-        can_run = any(r.get("campus") == "shapingba" for r in rooms.values())
-    assert can_run is True
+    rooms = scheduler._eligible_rooms()
+    assert room["id"] in rooms
+
+
+def test_nh_account_response_sensitive_data_redacted(repo, tmp_path):
+    sensitive_acct = [{
+        "F_AcctID": 2054,
+        "PointerName": "B区10号学生宿舍(271)Z",
+        "F_AcctName": "B10S306",
+        "B_F_InitBalance": 80.86,
+        "B_F_InitAllowance": 2.50,
+        "B_F_Totalace": 83.36,
+        "F_UserName": "张三",
+        "F_Addr": "沙坪坝区沙正街174号重大B区",
+        "F_IdNo": "500106199901011234",
+        "F_CellPhone": "13800138000",
+        "F_SalaryAcct": "6222021234567890",
+        "F_HomePhone": "02365100000",
+        "F_DeptName": "大数据与软件学院",
+    }]
+    client = ElectricityClient(tmp_path / "missing", nh_enabled=True, transport=make_nh_transport(acct_resp=sensitive_acct))
+    service = ElectricityService(repo, client)
+    room = repo.room(ROOM_B10)
+    result = asyncio.run(service.query(room, force=True))
+    assert result["ok"]
+
+    acct_resp = repo.one("SELECT raw_body FROM query_responses WHERE stage='nh_account'")
+    assert acct_resp is not None
+    raw = acct_resp["raw_body"]
+    raw_text = raw.decode("utf-8", errors="ignore") if isinstance(raw, bytes) else str(raw)
+    # Sensitive personal information must NEVER be persisted in plaintext
+    assert "张三" not in raw_text
+    assert "沙正街174号" not in raw_text
+    assert "500106199901011234" not in raw_text
+    assert "13800138000" not in raw_text
+    assert "6222021234567890" not in raw_text
+    assert "02365100000" not in raw_text
+    assert "大数据与软件学院" not in raw_text
+    assert "[REDACTED]" in raw_text
+
+    # Non-sensitive essential billing data must be preserved
+    assert "80.86" in raw_text
+    assert "B10S306" in raw_text
+
+
+def test_nh_optional_stats_timeout_preserves_core_reading(repo, tmp_path):
+    def slow_stats_handler(request):
+        url = str(request.url)
+        if "/df/Admin/Login" in url:
+            return httpx.Response(200, json=LOGIN_SUCCESS)
+        elif "/df/Home/GetAcctDs" in url:
+            return httpx.Response(200, json=ACCT_DATA)
+        elif "/df/Home/GetSAcctDs" in url:
+            return httpx.Response(200, json=SACCT_DATA)
+        elif "/df/Home/GetDeBils" in url or "/df/Home/Get48GourDs" in url:
+            # Simulate endpoint timeout by returning 504 / timeout
+            raise httpx.ReadTimeout("Server too slow")
+        return httpx.Response(404)
+
+    client = ElectricityClient(tmp_path / "missing", timeout=5, nh_enabled=True, transport=httpx.MockTransport(slow_stats_handler))
+    service = ElectricityService(repo, client)
+    room = repo.room(ROOM_B10)
+    result = asyncio.run(service.query(room, force=True))
+    # Core balance and meter reading must be returned successfully rather than discarded!
+    assert result["ok"]
+    assert result["reading"]["cash_balance_yuan"] == "80.86"
+    assert result["reading"]["meter_reading_kwh"] == "7061"
+    assert result["reading"]["today_kwh"] is None
+    assert result["reading"]["monthly_kwh"] is None
+
+
+def test_parse_nh_reading_no_data_does_not_fill_zero():
+    # Empty aaData (e.g. 02:00 morning before first point or network empty)
+    empty_gour = {"iTotalRecords": 0, "aaData": []}
+    now_bj = datetime(2026, 11, 11, 14, 0, 0, tzinfo=BEIJING)
+    reading = parse_nh_reading(ROOM_B10, ACCT_DATA, SACCT_DATA, Decimal("0.54"), gour_data=empty_gour, now_bj=now_bj)
+    # Must remain None, never fabricated as Decimal("0")
+    assert reading.today_kwh is None
+    assert reading.today_cost_yuan is None
+    assert reading.today_point is None
+
+    fake_result = {
+        "ok": True,
+        "room": {"campus": "shapingba", "building": "B区10舍", "room_number": "B10S306"},
+        "reading": {**reading.fields(), "finished_at": "2026-11-11T06:00:00+00:00"},
+    }
+    detail_text = summary(fake_result, detail=True)
+    assert "今日用量" not in detail_text
+
+
+def test_summary_cross_day_cache_and_month_label():
+    # 1. Yesterday snapshot: should display "11月10日用量" instead of "今日用量"
+    yesterday_reading = {
+        "finished_at": "2026-11-10T14:00:00+00:00",
+        "cash_balance_yuan": "80.86",
+        "subsidy_kwh": None,
+        "subsidy_balance_yuan": "2.50",
+        "total_balance_yuan": "83.36",
+        "meter_reading_kwh": "7061",
+        "unit_price_yuan": "0.54",
+        "today_kwh": "2.0000",
+        "today_cost_yuan": "1.0800",
+        "today_point": "12:00",
+        "monthly_kwh": "163",
+        "monthly_cost_yuan": "88.02",
+        "monthly_name": "2026年10月",
+    }
+    fake_result = {
+        "ok": True,
+        "room": {"campus": "shapingba", "building": "B区10舍", "room_number": "B10S306"},
+        "reading": yesterday_reading,
+    }
+    detail_text = summary(fake_result, detail=True)
+    # Since finished_at is 11-10 and current date is 11-11, it should show 11月10日用量
+    assert "今日用量" not in detail_text
+    assert "11月10日用量：约 2.00 度（11月10日零点至 12:00） · 约 1.08 元" in detail_text
+    # Since monthly_name is 2026年10月 (not current November), it should show 最近账单
+    assert "本月累计" not in detail_text
+    assert "最近账单：163.00 度 · 电费 88.02 元（2026年10月）" in detail_text
+
+
+def test_scheduler_mixed_campus_without_token_filters_huxi(repo, tmp_path):
+    client = ElectricityClient(tmp_path / "missing", nh_enabled=True, transport=make_nh_transport())
+    service = ElectricityService(repo, client)
+
+    room_shapingba = repo.room(ROOM_B10)
+    room_huxi = repo.room(ROOM_HUXI)
+    repo.bind(IDENTITY, room_shapingba["id"], ORIGIN)
+    repo.bind(("qq-test", "123", "1002"), room_huxi["id"], "qq-test:GroupMessage:123")
+
+    async def send(*args):
+        pass
+
+    scheduler = Scheduler(service, lambda *x: True, send, capture_times=("09:00",), reminder_enabled=False)
+    rooms = scheduler._eligible_rooms()
+    # Shapingba room is eligible without token
+    assert room_shapingba["id"] in rooms
+    # Huxi room is NOT eligible without token and MUST be filtered out
+    assert room_huxi["id"] not in rooms

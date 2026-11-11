@@ -17,10 +17,22 @@ from .models import Room, Reading, QueryError, number, building_name, shapingba_
 BEIJING = timezone(timedelta(hours=8))
 HOST = "payment.cqu.edu.cn"
 NH_HOST = "nh.cqu.edu.cn:26989"
-SENSITIVE = {"token", "accesstoken", "refreshtoken", "authorization", "synjonesauth", "cookie", "setcookie", "password", "secret", "appsecret"}
+SENSITIVE = {
+    "token", "accesstoken", "refreshtoken", "authorization", "synjonesauth", "cookie", "setcookie", "password", "secret", "appsecret",
+    "fusername", "username", "faddr", "addr", "fidno", "idno", "fcellphone", "cellphone", "phone", "mobile",
+    "fsalaryacct", "salaryacct", "fhomephone", "homephone", "fidname", "idname", "idcard", "realname",
+    "fdept", "dept", "fdeptname", "deptname", "fmemo", "memo",
+}
+
+NH_ACCOUNT_ALLOWED = {
+    "f_acctid", "f_buildingid", "pointername", "f_opendate", "f_opendatestr", "f_closedate",
+    "f_openstate", "f_initbalance", "f_initallowance", "f_notifytimes", "f_order", "f_prepay",
+    "f_acctname", "f_acctpy", "b_f_totalace", "b_f_totaldegree", "b_f_initallowance",
+    "b_f_initbalance", "b_f_balancedegree", "eprid", "eprname", "f_accttype", "f_accttypent",
+}
 
 
-def redact_body(body, token):
+def redact_body(body, token, stage=None):
     # Preserve response bytes when no secret is present. Never store request headers.
     target_values = {token, quote(token, safe=""), escape(token)} - {""}
     for value in target_values:
@@ -28,21 +40,26 @@ def redact_body(body, token):
     try:
         value = json.loads(body)
     except (ValueError, UnicodeError):
-        return re.sub(rb'(?i)((?:access_token|refresh_token|password|authorization|synjones-auth)[\s"\']*[:=][\s"\']*)([^"\'<>\s,}]+)', rb'\1[REDACTED]', body)
+        return re.sub(rb'(?i)((?:access_token|refresh_token|password|authorization|synjones-auth|f_username|f_addr|f_idno|f_cellphone|f_salaryacct|f_homephone)[\s"\']*[:=][\s"\']*)([^"\'<>\s,}]+)', rb'\1[REDACTED]', body)
     changed = False
-    def clean(item):
+    def clean(item, is_account_stage=False):
         nonlocal changed
         if isinstance(item, dict):
             result = {}
             for key, val in item.items():
-                if re.sub(r"[^a-z]", "", key.lower()) in SENSITIVE:
+                norm = re.sub(r"[^a-z0-9_]", "", key.lower())
+                norm_az = re.sub(r"[^a-z]", "", key.lower())
+                if is_account_stage and norm not in NH_ACCOUNT_ALLOWED:
+                    result[key] = "[REDACTED]"
+                    changed = True
+                elif norm_az in SENSITIVE:
                     result[key] = "[REDACTED]"
                     changed = True
                 else:
-                    result[key] = clean(val)
+                    result[key] = clean(val, is_account_stage)
             return result
         if isinstance(item, list):
-            return [clean(v) for v in item]
+            return [clean(v, is_account_stage) for v in item]
         if isinstance(item, str):
             res_str = item
             for tv in target_values:
@@ -51,7 +68,7 @@ def redact_body(body, token):
                     changed = True
             return res_str
         return item
-    cleaned = clean(value)
+    cleaned = clean(value, is_account_stage=(stage == "nh_account"))
     return json.dumps(cleaned, ensure_ascii=False).encode() if changed else body
 
 
@@ -213,10 +230,6 @@ def parse_nh_reading(room, acct_data, sacct_data, default_price=Decimal("0.54"),
                     today_point = last_t.split()[-1] if " " in last_t else last_t
                 except (ValueError, TypeError):
                     today_kwh, today_cost_yuan, today_point = None, None, None
-            else:
-                today_kwh = Decimal("0")
-                today_cost_yuan = Decimal("0")
-                today_point = "00:00"
 
     id_info = shapingba_building(building_raw) or shapingba_building(room.building)
     resolved = f"{id_info[0]}区{id_info[1]}舍" if id_info else room.building
@@ -262,26 +275,29 @@ class ElectricityClient:
         url_base = f"{self.nh_scheme}://{self.nh_host}"
         headers = {"User-Agent": "AstrBot-CQU-Electricity/0.1.7"}
         try:
-            async with asyncio.timeout(self.timeout):
-                async with httpx.AsyncClient(headers=headers, timeout=min(15, self.timeout), follow_redirects=False, transport=self.transport) as http:
-                    async def request(stage, method, path, *, data=None, params=None):
-                        async with http.stream(method, f"{url_base}{path}", data=data, params=params) as response:
-                            chunks, size = [], 0
-                            async for chunk in response.aiter_bytes():
-                                chunks.append(chunk)
-                                size += len(chunk)
-                                if size > 2 * 1024 * 1024:
-                                    record(stage, response.status_code, response.headers.get("content-type", ""), redact_body(b"".join(chunks), ""))
-                                    raise QueryError("RESPONSE_TOO_LARGE")
-                            body = b"".join(chunks)
-                            record(stage, response.status_code, response.headers.get("content-type", ""), redact_body(body, ""))
-                            if response.status_code >= 400:
-                                raise QueryError("HTTP_ERROR")
-                            try:
-                                return json.loads(body)
-                            except (ValueError, UnicodeError):
-                                raise QueryError("INVALID_RESPONSE") from None
+            async with httpx.AsyncClient(headers=headers, timeout=min(15, self.timeout), follow_redirects=False, transport=self.transport) as http:
+                async def request(stage, method, path, *, data=None, params=None, req_timeout=None):
+                    t = req_timeout or min(15.0, self.timeout)
+                    async with http.stream(method, f"{url_base}{path}", data=data, params=params, timeout=t) as response:
+                        chunks, size = [], 0
+                        async for chunk in response.aiter_bytes():
+                            chunks.append(chunk)
+                            size += len(chunk)
+                            if size > 2 * 1024 * 1024:
+                                record(stage, response.status_code, response.headers.get("content-type", ""), redact_body(b"".join(chunks), "", stage=stage))
+                                raise QueryError("RESPONSE_TOO_LARGE")
+                        body = b"".join(chunks)
+                        record(stage, response.status_code, response.headers.get("content-type", ""), redact_body(body, "", stage=stage))
+                        if response.status_code >= 400:
+                            raise QueryError("HTTP_ERROR")
+                        try:
+                            return json.loads(body)
+                        except (ValueError, UnicodeError):
+                            raise QueryError("INVALID_RESPONSE") from None
 
+                # Core data: login, account balance, and device meter reading.
+                # Strictly guarded by self.timeout.
+                async with asyncio.timeout(self.timeout):
                     login_data = await request("nh_login", "POST", "/df/Admin/Login", data={"username": room.room_number})
                     if not isinstance(login_data, dict):
                         raise QueryError("INVALID_RESPONSE")
@@ -296,17 +312,23 @@ class ElectricityClient:
                     acct_data = await request("nh_account", "GET", "/df/Home/GetAcctDs", params={"SysLoginAcctID": acct_id})
                     sacct_data = await request("nh_device", "GET", "/df/Home/GetSAcctDs", params={"sEcho": 1, "iDisplayStart": 0, "iDisplayLength": 30, "sSearch": acct_id})
 
-                    debils_data, gour_data = None, None
-                    try:
-                        debils_data = await request("nh_debils", "GET", "/df/Home/GetDeBils", params={"SysLoginAcctID": acct_id})
-                    except Exception:
-                        pass
-                    try:
-                        gour_data = await request("nh_48h", "GET", "/df/Home/Get48GourDs", params={"sEcho": 1, "iDisplayStart": 0, "iDisplayLength": 200, "sSearch": acct_id})
-                    except Exception:
-                        pass
+                # Core data is now secured. Optional stats (debils, 48h) run with an isolated,
+                # short timeout budget (3.0s each). Any timeout or error in optional endpoints
+                # must never drop or fail the already-successful base reading.
+                debils_data, gour_data = None, None
+                try:
+                    async with asyncio.timeout(3.0):
+                        debils_data = await request("nh_debils", "GET", "/df/Home/GetDeBils", params={"SysLoginAcctID": acct_id}, req_timeout=3.0)
+                except (TimeoutError, httpx.TimeoutException, QueryError, Exception):
+                    debils_data = None
 
-                    return parse_nh_reading(room, acct_data, sacct_data, self.price, debils_data=debils_data, gour_data=gour_data)
+                try:
+                    async with asyncio.timeout(3.0):
+                        gour_data = await request("nh_48h", "GET", "/df/Home/Get48GourDs", params={"sEcho": 1, "iDisplayStart": 0, "iDisplayLength": 200, "sSearch": acct_id}, req_timeout=3.0)
+                except (TimeoutError, httpx.TimeoutException, QueryError, Exception):
+                    gour_data = None
+
+                return parse_nh_reading(room, acct_data, sacct_data, self.price, debils_data=debils_data, gour_data=gour_data)
         except QueryError:
             raise
         except (TimeoutError, httpx.TimeoutException):
