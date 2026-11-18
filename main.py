@@ -47,7 +47,7 @@ HELP="""⚡ 宿舍电费
 提醒发送到最后一次开启提醒的会话。"""
 
 
-@register("astrbot_plugin_cqu_electricity","Zesuy","宿舍电费看板、金额/天数提醒与本人管理工具","0.1.17")
+@register("astrbot_plugin_cqu_electricity","Zesuy","宿舍电费看板、金额/天数提醒与本人管理工具","0.1.18")
 class CquElectricityPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
