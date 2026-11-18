@@ -65,7 +65,7 @@ def test_same_morning_meter_is_not_shown_as_zero_shapingba_usage():
     assert bar['value'] is None and bar['reason']=='未观测到电表读数变化'
 
 
-def test_unchanged_balance_and_failed_fixed_capture_do_not_hide_meter_interval():
+def test_unchanged_balance_and_failed_fixed_capture_leave_daily_values_unknown():
     d=data(4)
     first, unchanged, morning, failed=d['captures']
     first['reading']['meter_reading_kwh']='694'
@@ -77,7 +77,7 @@ def test_unchanged_balance_and_failed_fixed_capture_do_not_hide_meter_interval()
     m=make_model(d)
     assert [(b['value'],b['reason']) for b in m['reference_bars'][-3:]]==[
         (None,'未观测到扣费'),(None,'固定采集失败'),(None,'缺少采集记录')]
-    assert m['meter_interval']=={'start_at':unchanged['finished_at'],'end_at':morning['finished_at'],'kwh':'15'}
+    assert m['balance_points'][-2]['value']==morning['reading']['total_balance_yuan']
     assert m['forecast'] is None
 
 
