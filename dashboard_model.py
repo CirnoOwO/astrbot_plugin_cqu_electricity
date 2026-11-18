@@ -202,15 +202,6 @@ def make_model(data,days=7):
                                 capture_day not in by_day or by_day[capture_day]["kind"]!="fixed"):
                 reason="固定采集失败"
             bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":str(item["kwh"]) if item else None,"reason":reason})
-    meter_interval=None
-    if inferred:
-        incomplete={bar["capture_day"] for bar in bars if bar["value"] is None}
-        for previous,latest in reversed(list(zip(captures,captures[1:]))):
-            if (latest["day"].isoformat() in incomplete and previous["day"]<latest["day"] and
-                    previous["meter"] is not None and latest["meter"] is not None and latest["meter"]>previous["meter"]):
-                meter_interval={"start_at":previous["time"].isoformat(),"end_at":latest["time"].isoformat(),
-                                "kwh":str(latest["meter"]-previous["meter"])}
-                break
     any_meter=inferred or any(r["meter"] is not None for r in captures)
     last_failure=max(failures,key=lambda r:r["time"],default=None)
     warning=None
@@ -220,7 +211,7 @@ def make_model(data,days=7):
     if now<due and not morning:warning=(warning+" " if warning else "")+"昨天的数据将在今天"+data["schedule"]["time"]+"刷新。"
     increases=sum(1 for a,b in zip(captures,captures[1:]) if b["day"]>=start and b["day"]<=expected and b["balance"]>a["balance"])
     notice="余额增加可能来自充值或补助，不解释为负用电。" if increases else None
-    return {"schema_version":1,"room":{**room,"campus_label":{"huxi":"虎溪","shapingba":"沙坪坝"}[room["campus"]]},"generated_at":now.isoformat(),"schedule":data["schedule"],"window":{"days":days,"first_day":start.isoformat(),"last_day":expected.isoformat()},"balance":str(current["balance"]) if current else None,"display_balance":str(display_balance) if display_balance is not None else None,"settlement":morning,"price":str(current["price"]) if current and current["price"] else None,"captured_at":current["time"].isoformat() if current else None,"fresh":fresh,"warning":warning,"forecast":forecast,"forecast_reason":forecast_reason,"comparison":comparison,"balance_points":points,"balance_axis":nice_axis([p["value"] for p in points]),"reference_bars":bars if any_meter else [],"meter_axis":nice_axis([b["value"] for b in bars]) if any_meter else None,"meter_interval":meter_interval,"notice":notice,"provenance":data.get("provenance",{})}
+    return {"schema_version":1,"room":{**room,"campus_label":{"huxi":"虎溪","shapingba":"沙坪坝"}[room["campus"]]},"generated_at":now.isoformat(),"schedule":data["schedule"],"window":{"days":days,"first_day":start.isoformat(),"last_day":expected.isoformat()},"balance":str(current["balance"]) if current else None,"display_balance":str(display_balance) if display_balance is not None else None,"settlement":morning,"price":str(current["price"]) if current and current["price"] else None,"captured_at":current["time"].isoformat() if current else None,"fresh":fresh,"warning":warning,"forecast":forecast,"forecast_reason":forecast_reason,"comparison":comparison,"balance_points":points,"balance_axis":nice_axis([p["value"] for p in points]),"reference_bars":bars if any_meter else [],"meter_axis":nice_axis([b["value"] for b in bars]) if any_meter else None,"notice":notice,"provenance":data.get("provenance",{})}
 
 def build(input_path,output,days=7):
     data=json.loads(Path(input_path).read_text(encoding="utf-8-sig"))
