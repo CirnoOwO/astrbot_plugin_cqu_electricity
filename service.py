@@ -105,6 +105,8 @@ class ElectricityService:
         failure=self.repo.latest(room["id"],"failed")
         morning=morning_snapshot(self.repo.completed_runs(room["id"],now=now),now)
         if morning:
+            if room["campus"]=="shapingba" and morning["usage"] and Decimal(morning["usage"]["kwh"])==0:
+                morning={**morning,"usage":None,"unavailable_reason":"未观测到电表读数变化，不能确认当日用电量"}
             current=next(r for r in rows if r["id"]==morning["reading_id"])
             error=morning["refresh_error"]
             result=public_result(room,current,cached=True,error=error)
@@ -124,20 +126,24 @@ class ElectricityService:
         result["stale"]=bool(current) and (stale or bool(error))
         state="before_refresh" if before else "ready" if ready else "refresh_failed" if scheduled_failure else "awaiting_refresh"
         estimate=None
+        unavailable_reason="缺少连续的14:00日记录或有效电表读数"
         if chosen and len(fixed)>=2:
             previous=fixed[-2]
             delta=chosen.get("usage")
             adjacent=chosen.get("span_days")==1 and (datetime.fromisoformat(chosen["day"])-datetime.fromisoformat(previous["day"])).days==1
-            if adjacent and delta and delta.get("available"):
-                estimate={"reference_day":(datetime.fromisoformat(chosen["day"]).date()-timedelta(days=1)).isoformat(),
-                          "kwh":delta["kwh"],"cost_yuan":str(Decimal(delta["kwh"])*Decimal(current["unit_price_yuan"])),
-                          "estimated":True,"method":"daily_meter_difference_times_price",
-                          "note":"按相邻日采集的读数差作前一日参考，不代表学校实际计量时段或实际扣费。"}
+            if adjacent and delta and delta.get("available") and 23.5<=delta["interval_hours"]<=24.5:
+                if room["campus"]=="shapingba" and Decimal(delta["kwh"])==0:
+                    unavailable_reason="未观测到电表读数变化，不能确认当日用电量"
+                else:
+                    estimate={"reference_day":(datetime.fromisoformat(chosen["day"]).date()-timedelta(days=1)).isoformat(),
+                              "kwh":delta["kwh"],"cost_yuan":str(Decimal(delta["kwh"])*Decimal(current["unit_price_yuan"])),
+                              "estimated":True,"method":"daily_meter_difference_times_price",
+                              "note":"按相邻日采集的读数差作前一日参考，不代表学校实际计量时段或实际扣费。"}
         result["usage"]=chosen.get("usage") if chosen else None
         result["daily_brief"]={"state":state,"snapshot_day":chosen["day"] if chosen else None,
                                "expected_snapshot_day":expected,"estimate":estimate,"source":"sqlite_daily_snapshot" if chosen else "sqlite_latest_capture",
                                "today":now.date().isoformat(),"next_refresh_at":(due if before else due+timedelta(days=1)).isoformat(),
-                               "refresh_error":error,"estimated_day_unavailable_reason":None if estimate else "缺少连续的14:00日记录或有效电表读数"}
+                               "refresh_error":error,"estimated_day_unavailable_reason":None if estimate else unavailable_reason}
         return result
 
     def history(self, identity, days=7):

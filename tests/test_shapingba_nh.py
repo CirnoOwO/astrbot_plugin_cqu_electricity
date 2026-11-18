@@ -128,11 +128,13 @@ def test_parse_nh_reading_with_debils_and_gour():
     assert "今日用量" not in normal_text
     assert "本月累计" not in normal_text
 
-    detail_text = summary(fake_result, detail=True)
+    detail_text = summary(fake_result, detail=True, now=now_bj)
     assert "今日用量：约 3.00 度（今日零点至 06:00） · 约 1.62 元" in detail_text
     assert "本月累计：49.00 度 · 电费 26.46 元（2026年11月）" in detail_text
 
-    fake_brief_result = {**fake_result, "daily_brief": {"state": "ready", "estimate": None}}
+    historical_text = summary(fake_result, detail=True, now=datetime(2026, 12, 1, tzinfo=BEIJING))
+    assert "11月11日用量" in historical_text and "最近账单" in historical_text
+    fake_brief_result = {**fake_result, "daily_brief": {"state": "ready", "estimate": None, "today": "2026-11-11"}}
     brief_text = daily_brief_text(fake_brief_result, detail=True)
     assert "今日用量：约 3.00 度（今日零点至 06:00） · 约 1.62 元" in brief_text
     assert "本月累计：49.00 度 · 电费 26.46 元（2026年11月）" in brief_text

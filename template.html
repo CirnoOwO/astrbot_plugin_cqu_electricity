@@ -434,9 +434,9 @@ if (isMorning) {
 }
 
 const meterNotes = [isSh ? '按余额扣费 ÷ 电价估算；日期标在前一天，不等同自然日用电。' : '按相邻采集的电表读数差统计，标在前一天，不等同自然日用电。'];
-for (const reason of ['未观测到扣费', '固定采集失败']) {
+for (const reason of ['未观测到扣费', '未观测到电表读数变化', '固定采集失败']) {
   const dates = d.reference_bars.filter(b => b.reason === reason).map(b => md(b.reference_day));
-  if (dates.length) meterNotes.push(dates.join('、') + '：' + reason + (reason === '未观测到扣费' ? '，不代表零用电。' : '，不补算日用电。'));
+  if (dates.length) meterNotes.push(dates.join('、') + '：' + reason + (reason === '固定采集失败' ? '，不补算日用电。' : '，不代表零用电。'));
 }
 if (d.meter_interval) {
   const interval = d.meter_interval;

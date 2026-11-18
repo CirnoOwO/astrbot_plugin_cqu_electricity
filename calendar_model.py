@@ -114,6 +114,8 @@ def make_calendar_model(source):
                 reason = "无法估算"
             elif any(_increased(x, y) for x, y in zip(trail, trail[1:])):
                 reason = "余额增加"
+            elif balances[0] == balances[-1]:
+                reason = "未观测到扣费"
             else:
                 value = (balances[0] - balances[-1]) / prices[-1]
         else:
