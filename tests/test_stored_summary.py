@@ -49,6 +49,18 @@ def test_after_success_yesterday_estimate_from_daily_not_last_manual(env):
     assert "实际扣费" in summary(data) and "36.60" in summary(data)
     assert not data["stale"]
 
+
+@pytest.mark.parametrize("hour", [10, 15])
+def test_shapingba_repeated_meter_does_not_claim_zero_daily_usage(env,hour):
+    repo,service,room=env
+    room={**room,"campus":"shapingba"}
+    capture(repo,room,"2026-10-02T14:00:20","100","20")
+    capture(repo,room,"2026-10-03T09:00:20","100","20")
+    capture(repo,room,"2026-10-03T14:00:20","100","20")
+    model=service.stored_result(room,now=at(hour))
+    assert model["daily_brief"]["estimate"] is None
+    assert "未观测到电表读数变化" in summary(model)
+
 def test_later_manual_capture_does_not_replace_daily_snapshot(env):
     service,room=snapshots(env)
     capture(env[0],room,"2026-10-03T18:00:00","106","36.06")

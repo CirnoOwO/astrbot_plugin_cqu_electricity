@@ -179,6 +179,8 @@ def make_model(data,days=7):
         points[-1].update(platform_value=points[-1]["value"],value=str(display_balance),kind="estimated")
     failed_fixed_days=set()
     for failure in failures:
+        if failure.get("trigger_type") not in (None,"scheduled"):
+            continue
         started=stamp(failure["started_at"])
         slot_start=started.replace(hour=hour,minute=minute,second=0,microsecond=0)
         if slot_start<=started<slot_start+timedelta(minutes=window):
@@ -190,7 +192,10 @@ def make_model(data,days=7):
         item=valid_by_day.get(capture_day)
         if morning and capture_day==expected:
             value=morning["usage"]["kwh"] if morning["usage"] else None
-            bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":value,"reason":morning["unavailable_reason"] if value is None else None,"kind":"morning"})
+            reason=morning["unavailable_reason"] if value is None else None
+            if inferred and value is not None and Decimal(value)==0:
+                value,reason=None,"未观测到电表读数变化"
+            bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":value,"reason":reason,"kind":"morning"})
         else:
             reason=reasons.get(capture_day,"缺少采集记录") if not item else None
             if not item and capture_day in failed_fixed_days and (

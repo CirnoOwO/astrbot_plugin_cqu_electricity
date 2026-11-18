@@ -31,7 +31,7 @@ def dashboard_room_input(repo, room, *, now=None, window_minutes=15):
     captures = []
     for row in rows:
         item = {key: row[key] for key in
-                ("id", "started_at", "finished_at", "status", "error_code")}
+                ("id", "started_at", "finished_at", "status", "error_code", "trigger_type")}
         item["capture_slot"] = row.get("capture_slot")
         if row["status"] == "success":
             item["reading"] = {key: row[key] for key in fields}

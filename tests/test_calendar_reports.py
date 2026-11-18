@@ -89,6 +89,15 @@ def test_valid_zero_and_extended_batch_first_success_selection():
     assert by_day(m)["2026-10-01"]["balance"] == "10"
 
 
+def test_shapingba_unchanged_balance_does_not_count_as_a_recorded_day():
+    rows = [row("2026-10-01", 100, 10), row("2026-10-02", 100, 10),
+            row("2026-10-03", 115, "1.90")]
+    model = make_calendar_model(data(rows, month="2026-10", campus="shapingba"))
+    first = by_day(model)["2026-10-01"]
+    assert first["value"] is None and first["status"] == "未观测到扣费"
+    assert model["recorded_days"] == 1 and Decimal(model["total_kwh"]) == 15
+
+
 @pytest.mark.parametrize("invalid", [None, "price", "recharge", "subsidy", "meter_irrelevant"])
 def test_shapingba_estimation_checks_intermediate_successes(invalid):
     rows = [row("2026-10-01", None, 10), row("2026-10-02", None, "7.30")]

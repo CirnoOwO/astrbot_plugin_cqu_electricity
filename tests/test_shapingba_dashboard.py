@@ -47,6 +47,24 @@ def test_uncertain_intervals_do_not_create_consumption_or_infinite_forecast(kind
     if kind=='zero':assert m['reference_bars'][-1]['reason']=='未观测到扣费'
 
 
+def test_manual_failure_in_fixed_window_does_not_claim_schedule_failed():
+    d=data(2)
+    d['captures'][-1].update(status='failed',error_code='TIMEOUT',trigger_type='manual')
+    assert make_model(d)['reference_bars'][-1]['reason']=='缺少采集记录'
+
+
+def test_same_morning_meter_is_not_shown_as_zero_shapingba_usage():
+    d=data(2)
+    for row in d['captures']:
+        row['reading']['meter_reading_kwh']='694'
+    row=copy.deepcopy(d['captures'][-1])
+    row.update(id=100,started_at='2030-05-03T09:00:30+08:00',finished_at='2030-05-03T09:00:30+08:00')
+    d['captures'].append(row)
+    d['as_of']='2030-05-03T09:01:00+08:00'
+    bar=make_model(d)['reference_bars'][-1]
+    assert bar['value'] is None and bar['reason']=='未观测到电表读数变化'
+
+
 def test_unchanged_balance_and_failed_fixed_capture_do_not_hide_meter_interval():
     d=data(4)
     first, unchanged, morning, failed=d['captures']
