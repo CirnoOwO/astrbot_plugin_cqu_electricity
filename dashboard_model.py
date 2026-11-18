@@ -114,6 +114,9 @@ def make_model(data,days=7):
         elif any(b["meter"]<a["meter"] for a,b in zip(trail,trail[1:])):reason="电表读数回退"
         if reason:reasons[current_day["day"]]=reason;continue
         cost=previous["balance"]-current_day["balance"] if inferred else None
+        if inferred and cost == 0:
+            reasons[current_day["day"]]="未观测到扣费"
+            continue
         kwh=cost/current_day["price"] if inferred else current_day["meter"]-previous["meter"]
         item={"capture_day":current_day["day"],"reference_day":current_day["day"]-timedelta(days=1),"kwh":kwh,"cost":cost,"hours":duration,"first":previous,"last":current_day}
         intervals.append(item);valid_by_day[current_day["day"]]=item
@@ -174,6 +177,12 @@ def make_model(data,days=7):
     points=[{"day":day.isoformat(),"value":str(by_day[day]["balance"]) if day in by_day else None,"kind":by_day[day]["kind"] if day in by_day else "missing","captured_at":by_day[day]["time"].isoformat() if day in by_day else None} for day in dates]
     if morning and morning["estimated_balance_yuan"] is not None:
         points[-1].update(platform_value=points[-1]["value"],value=str(display_balance),kind="estimated")
+    failed_fixed_days=set()
+    for failure in failures:
+        started=stamp(failure["started_at"])
+        slot_start=started.replace(hour=hour,minute=minute,second=0,microsecond=0)
+        if slot_start<=started<slot_start+timedelta(minutes=window):
+            failed_fixed_days.add(started.date())
     bars=[]
     for i in range(days):
         reference=start+timedelta(days=i);capture_day=reference+timedelta(days=1)
@@ -182,7 +191,21 @@ def make_model(data,days=7):
         if morning and capture_day==expected:
             value=morning["usage"]["kwh"] if morning["usage"] else None
             bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":value,"reason":morning["unavailable_reason"] if value is None else None,"kind":"morning"})
-        else:bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":str(item["kwh"]) if item else None,"reason":reasons.get(capture_day,"缺少采集记录") if not item else None})
+        else:
+            reason=reasons.get(capture_day,"缺少采集记录") if not item else None
+            if not item and capture_day in failed_fixed_days and (
+                                capture_day not in by_day or by_day[capture_day]["kind"]!="fixed"):
+                reason="固定采集失败"
+            bars.append({"reference_day":reference.isoformat(),"capture_day":capture_day.isoformat(),"value":str(item["kwh"]) if item else None,"reason":reason})
+    meter_interval=None
+    if inferred:
+        incomplete={bar["capture_day"] for bar in bars if bar["value"] is None}
+        for previous,latest in reversed(list(zip(captures,captures[1:]))):
+            if (latest["day"].isoformat() in incomplete and previous["day"]<latest["day"] and
+                    previous["meter"] is not None and latest["meter"] is not None and latest["meter"]>previous["meter"]):
+                meter_interval={"start_at":previous["time"].isoformat(),"end_at":latest["time"].isoformat(),
+                                "kwh":str(latest["meter"]-previous["meter"])}
+                break
     any_meter=inferred or any(r["meter"] is not None for r in captures)
     last_failure=max(failures,key=lambda r:r["time"],default=None)
     warning=None
@@ -192,7 +215,7 @@ def make_model(data,days=7):
     if now<due and not morning:warning=(warning+" " if warning else "")+"昨天的数据将在今天"+data["schedule"]["time"]+"刷新。"
     increases=sum(1 for a,b in zip(captures,captures[1:]) if b["day"]>=start and b["day"]<=expected and b["balance"]>a["balance"])
     notice="余额增加可能来自充值或补助，不解释为负用电。" if increases else None
-    return {"schema_version":1,"room":{**room,"campus_label":{"huxi":"虎溪","shapingba":"沙坪坝"}[room["campus"]]},"generated_at":now.isoformat(),"schedule":data["schedule"],"window":{"days":days,"first_day":start.isoformat(),"last_day":expected.isoformat()},"balance":str(current["balance"]) if current else None,"display_balance":str(display_balance) if display_balance is not None else None,"settlement":morning,"price":str(current["price"]) if current and current["price"] else None,"captured_at":current["time"].isoformat() if current else None,"fresh":fresh,"warning":warning,"forecast":forecast,"forecast_reason":forecast_reason,"comparison":comparison,"balance_points":points,"balance_axis":nice_axis([p["value"] for p in points]),"reference_bars":bars if any_meter else [],"meter_axis":nice_axis([b["value"] for b in bars]) if any_meter else None,"notice":notice,"provenance":data.get("provenance",{})}
+    return {"schema_version":1,"room":{**room,"campus_label":{"huxi":"虎溪","shapingba":"沙坪坝"}[room["campus"]]},"generated_at":now.isoformat(),"schedule":data["schedule"],"window":{"days":days,"first_day":start.isoformat(),"last_day":expected.isoformat()},"balance":str(current["balance"]) if current else None,"display_balance":str(display_balance) if display_balance is not None else None,"settlement":morning,"price":str(current["price"]) if current and current["price"] else None,"captured_at":current["time"].isoformat() if current else None,"fresh":fresh,"warning":warning,"forecast":forecast,"forecast_reason":forecast_reason,"comparison":comparison,"balance_points":points,"balance_axis":nice_axis([p["value"] for p in points]),"reference_bars":bars if any_meter else [],"meter_axis":nice_axis([b["value"] for b in bars]) if any_meter else None,"meter_interval":meter_interval,"notice":notice,"provenance":data.get("provenance",{})}
 
 def build(input_path,output,days=7):
     data=json.loads(Path(input_path).read_text(encoding="utf-8-sig"))

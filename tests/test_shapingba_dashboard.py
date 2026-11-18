@@ -43,7 +43,24 @@ def test_uncertain_intervals_do_not_create_consumption_or_infinite_forecast(kind
         for row in d['captures']:row['reading'].update(total_balance_yuan='70',cash_balance_yuan='70')
     m=make_model(d)
     assert m['forecast'] is None
-    if kind!='zero':assert m['reference_bars'][-1]['value'] is None
+    assert m['reference_bars'][-1]['value'] is None
+    if kind=='zero':assert m['reference_bars'][-1]['reason']=='未观测到扣费'
+
+
+def test_unchanged_balance_and_failed_fixed_capture_do_not_hide_meter_interval():
+    d=data(4)
+    first, unchanged, morning, failed=d['captures']
+    first['reading']['meter_reading_kwh']='694'
+    unchanged['reading']=copy.deepcopy(first['reading'])
+    morning.update(started_at='2030-05-03T09:00:00+08:00',finished_at='2030-05-03T09:00:05+08:00')
+    morning['reading']['meter_reading_kwh']='709'
+    failed.update(started_at='2030-05-03T14:00:00+08:00',finished_at='2030-05-03T14:00:30+08:00',
+                  status='failed',error_code='TIMEOUT')
+    m=make_model(d)
+    assert [(b['value'],b['reason']) for b in m['reference_bars'][-3:]]==[
+        (None,'未观测到扣费'),(None,'固定采集失败'),(None,'缺少采集记录')]
+    assert m['meter_interval']=={'start_at':unchanged['finished_at'],'end_at':morning['finished_at'],'kwh':'15'}
+    assert m['forecast'] is None
 
 
 def test_morning_uses_actual_balance_and_previous_complete_daily_intervals():

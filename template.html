@@ -433,7 +433,17 @@ if (isMorning) {
   put('pending-cost', '预计扣费 ¥' + fmt(d.settlement.pending_cost_yuan));
 }
 
-put('meter-note', isSh ? '按余额扣费 ÷ 电价估算；日期标在前一天。' : '按相邻采集的电表读数差统计，标在前一天，不等同自然日用电。');
+const meterNotes = [isSh ? '按余额扣费 ÷ 电价估算；日期标在前一天，不等同自然日用电。' : '按相邻采集的电表读数差统计，标在前一天，不等同自然日用电。'];
+for (const reason of ['未观测到扣费', '固定采集失败']) {
+  const dates = d.reference_bars.filter(b => b.reason === reason).map(b => md(b.reference_day));
+  if (dates.length) meterNotes.push(dates.join('、') + '：' + reason + (reason === '未观测到扣费' ? '，不代表零用电。' : '，不补算日用电。'));
+}
+if (d.meter_interval) {
+  const interval = d.meter_interval;
+  meterNotes.push(timeFmt(new Date(interval.start_at)) + ' 至 ' + timeFmt(new Date(interval.end_at)) +
+    '，累计表读数增加 ' + fmt(interval.kwh) + ' 度，不分摊到单日。');
+}
+put('meter-note', meterNotes.join(' '));
 
 // 计算近几日平均用电并显示在右上角胶囊
 const validBars = (d.reference_bars || []).filter(b => b.value !== null);
@@ -590,7 +600,6 @@ function renderBars() {
   if (!bars.some(b => b.value !== null)) {
     el('meter-chart').textContent = '暂无完整日用电记录';
     el('meter-chart').classList.add('empty');
-    el('meter-note').hidden = true;
     return;
   }
   const svg = svgIn('meter-chart', 220),
